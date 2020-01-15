@@ -17,12 +17,12 @@ def index():
 then, run it:
 
 ~~~bash
-python __main__.py /YOUR_ABSOLUTE_PATH/demo.py
+$ python __main__.py /YOUR_ABSOLUTE_PATH/demo.py
 ~~~
 
 make a HTTP request:
 
 ~~~bash
-curl http://localhost:8080
+$ curl http://localhost:8080
 Hello World
 ~~~
