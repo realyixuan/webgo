@@ -1,4 +1,4 @@
-from webgo.server import serving
+from webgo.wsgiserver import serving
 
 
 if __name__ == '__main__':

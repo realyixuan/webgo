@@ -4,8 +4,8 @@ import webob
 
 
 class Application:
-    def __init__(self, pyfile):
-        self.handlers = route_mapping(pyfile) 
+    def __init__(self, module):
+        self.handlers = route_mapping(module) 
 
     def build_response(self, request):
         path = request.path
@@ -15,7 +15,7 @@ class Application:
 
     def response(self, request):
         if request.method == 'GET':
-             return self.build_response(request)
+            return self.build_response(request)
         else:
             return webob.Response(text='Not Yet Supported')
 
@@ -24,9 +24,9 @@ class Application:
         return self.response(request)(environ, start_response)
 
 
-def route_mapping(pyfile):
+def route_mapping(module):
     handlers = {}
-    aim_module = _import(pyfile)
+    aim_module = _import(module)
     for obj in aim_module.__dict__.values():
         if hasattr(obj, 'response_attached'):
             handlers[obj.path] = obj.response_attached

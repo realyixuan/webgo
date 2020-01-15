@@ -13,4 +13,4 @@ def wow():
 
 @query('/python')
 def python():
-    return 'Hello, Python'
+    return 'Nice, Python'
