@@ -4,13 +4,13 @@
 
 A micro web framework
 
-For instance, there is a demo.py:
+For instance, supposing there is a simplest demo.py:
 
 ~~~python
 from webgo.handler import query
 
 @query('/')
-def index():
+def index(request):
     return 'Hello World'
 ~~~
 
