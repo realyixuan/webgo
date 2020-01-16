@@ -1,3 +1,5 @@
+
+
 def query(path):
     return lambda func: _Handler(func, path)
 
@@ -7,6 +9,6 @@ class _Handler:
         self.origin_func = func
         self.path = path
 
-    def response_attached(self):
-        return self.origin_func()
+    def response_attached(self, request):
+        return self.origin_func(request)
         

@@ -11,7 +11,8 @@ class Application:
         path = request.path
         if path not in self.handlers:
             return webob.Response(text='Not Found')
-        return webob.Response(text=self.handlers[path]())
+        handler = self.handlers[path]
+        return webob.Response(text=handler(request))
 
     def response(self, request):
         if request.method == 'GET':

@@ -8,11 +8,11 @@ from . import webgoapp
 
 
 def serving(Application=webgoapp.Application):
-    # file_ must be a absolute path
     file_ = parse_command_argument()
     module_name = _load_module(file_)
     app = Application(module_name)
     
+    # Reload file if file modified
     app = Reload(app, file_)
 
     print(f'Serving { module_name } ... ')
@@ -46,10 +46,10 @@ class Reload:
     def __init__(self, app, file_):
         self.app = app
         self.file_ = file_
-        self.mtime = os.stat(file_).st_mtime
+        self.mtime = os.path.getctime(file_)
 
     def __call__(self, environ, start_response):
-        mtime_now = os.stat(self.file_).st_mtime
+        mtime_now = os.path.getctime(self.file_)
         if mtime_now != self.mtime:
             print(f'Reloading { self.file_ } ... ')
             module_name = _load_module(self.file_)

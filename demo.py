@@ -2,15 +2,20 @@ from webgo.handler import query
 
 
 @query('/')
-def index():
+def index(request):
     return 'Hello World'
 
 
-@query('/yes/wow')
-def wow():
+@query('/wow')
+def wow(request):
     return 'Wow, it works'
 
 
-@query('/python')
-def python():
-    return 'Nice, Python'
+@query('/whatup')
+def python(request):
+    if request.method == 'GET':
+        names = ['hello']
+        for key, value in request.params.items():
+            names.append(value)
+        return ' '.join(names)
+
