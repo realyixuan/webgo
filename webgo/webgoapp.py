@@ -1,7 +1,10 @@
+import os
 import importlib
 import inspect
 
 import webob
+
+from .template import StaticFile
 
 
 class Application:
@@ -14,8 +17,8 @@ class Application:
         if path not in handlers:
             return webob.Response(text='Not Found')
         handler = handlers[path]
-        if hasattr(handler, 'static_mime'):
-            mime_type = handler.static_mime()
+        if hasattr(handler, 'mimetype'):
+            mime_type = handler.mimetype
             return webob.Response(text=handler.response_attached(request),
                                   content_type=mime_type)
         return webob.Response(text=handler.response_attached(request))
@@ -23,12 +26,15 @@ class Application:
     def response(self, request):
         return self.build_response(request)
 
+    def static_file(self):
+        pass
+
     def __call__(self, environ, start_response):
         request = webob.Request(environ)
         return self.response(request)(environ, start_response)
 
 
-def route_mapping(upackage: str):
+def route_mapping(upackage: str) -> dict:
     handlers = {
         'GET': {},
         'POST': {},
@@ -40,6 +46,16 @@ def route_mapping(upackage: str):
         for obj in module.__dict__.values():
             if hasattr(obj, 'response_attached'):
                 handlers[obj.method][obj.path] = obj
+
+    root_name = os.path.dirname(package.__file__)
+
+    # Mapping static file
+    css = ['/static/css/'+name
+           for name in os.listdir(root_name+'/static/css/')]
+    js = ['/static/js/'+name
+           for name in os.listdir(root_name+'/static/js/')]
+    for fpath in css+js:
+        handlers['GET'][fpath] = StaticFile(root_name+fpath)
     return handlers
 
 

@@ -1,5 +1,5 @@
 from webgo.handler import get, post
-from webgo.template import render, staticfile
+from webgo.template import render
 
 
 @get('/')
@@ -10,19 +10,10 @@ def index(request):
 def post_test(request):
     return 'Have Fun'
 
+@get('/wow')
+def static_text(request):
+    return render(request, 'demo/templates/index.html', context={
+        'name': 'wow',
+        'value': 'works',
+    })
 
-
-# @query('/whatup')
-# def python(request):
-#     if request.method == 'GET':
-#         name, value = 'Python', 'Nice'
-#         if request.params:
-#             name, value = 'name', request.params.getone('name')
-#     return render(request, 'index.html', context={
-#         'name': name,
-#         'value': value,
-#     })
-# 
-# @staticfile('/demo.css')
-# def static(request):
-#     return render(request, 'demo.css', {})
