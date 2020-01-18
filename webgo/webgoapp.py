@@ -1,36 +1,45 @@
 import importlib
+import inspect
 
 import webob
 
 
 class Application:
-    def __init__(self, module):
-        self.handlers = route_mapping(module) 
+    def __init__(self, package: str):
+        self.handlers = route_mapping(package) 
 
     def build_response(self, request):
         path = request.path
-        if path not in self.handlers:
+        handlers = self.handlers[request.method]
+        if path not in handlers:
             return webob.Response(text='Not Found')
-        handler = self.handlers[path]
-        return webob.Response(text=handler(request))
+        handler = handlers[path]
+        if hasattr(handler, 'static_mime'):
+            mime_type = handler.static_mime()
+            return webob.Response(text=handler.response_attached(request),
+                                  content_type=mime_type)
+        return webob.Response(text=handler.response_attached(request))
 
     def response(self, request):
-        if request.method == 'GET':
-            return self.build_response(request)
-        else:
-            return webob.Response(text='Not Yet Supported')
+        return self.build_response(request)
 
     def __call__(self, environ, start_response):
         request = webob.Request(environ)
         return self.response(request)(environ, start_response)
 
 
-def route_mapping(module):
-    handlers = {}
-    aim_module = _import(module)
-    for obj in aim_module.__dict__.values():
-        if hasattr(obj, 'response_attached'):
-            handlers[obj.path] = obj.response_attached
+def route_mapping(upackage: str):
+    handlers = {
+        'GET': {},
+        'POST': {},
+        }
+    package = _import(upackage)
+    for module in package.__dict__.values():
+        if not hasattr(module, '__dict__'):
+            continue
+        for obj in module.__dict__.values():
+            if hasattr(obj, 'response_attached'):
+                handlers[obj.method][obj.path] = obj
     return handlers
 
 

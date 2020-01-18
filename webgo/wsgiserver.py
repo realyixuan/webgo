@@ -5,17 +5,18 @@ import argparse
 from wsgiref.simple_server import make_server
 
 from . import webgoapp
+from .fileoperation import get_abs_path 
 
 
 def serving(Application=webgoapp.Application):
-    file_ = parse_command_argument()
-    module_name = _load_module(file_)
-    app = Application(module_name)
+    project = parse_command_argument()
+    package = _load_module(project)
+    app = Application(package)
     
     # Reload file if file modified
-    app = Reload(app, file_)
+    app = Reload(app, project)
 
-    print(f'Serving { module_name } ... ')
+    print(f'Serving { package } ... ')
     run_server(app)
 
 
@@ -23,10 +24,10 @@ def run_server(app):
     make_server('', 8080, app).serve_forever()
 
 
-def _load_module(file_):
-    mname = 'webgo__main__'
+def _load_module(file_: str) -> str:
+    mname = os.path.basename(file_)
     module = types.ModuleType(mname)
-    module.__file__ = file_
+    module.__file__ = os.path.join(file_, '__init__.py')
     with open(module.__file__) as fp:
         exec(fp.read(), module.__dict__)
     sys.modules[module.__name__] = module
@@ -35,25 +36,25 @@ def _load_module(file_):
 
 def parse_command_argument():
     parser = argparse.ArgumentParser()
-    parser.add_argument('view_file', help='your absolute view file path')
+    parser.add_argument('project', help='your project')
     args = parser.parse_args()
 
-    return args.view_file
+    return get_abs_path(args.project)
 
 
 class Reload:
     """ Module-reload Middleware """
-    def __init__(self, app, file_):
+    def __init__(self, app, project):
         self.app = app
-        self.file_ = file_
-        self.mtime = os.path.getctime(file_)
+        self.project = project
+        self.mtime = os.path.getctime(project)
 
     def __call__(self, environ, start_response):
-        mtime_now = os.path.getctime(self.file_)
+        mtime_now = os.path.getctime(self.project)
         if mtime_now != self.mtime:
-            print(f'Reloading { self.file_ } ... ')
-            module_name = _load_module(self.file_)
-            self.app.__init__(module_name)
+            print(f'Reloading { self.project } ... ')
+            package = _load_module(self.project)
+            self.app.__init__(package)
             self.mtime = mtime_now
         return self.app(environ, start_response)
 
