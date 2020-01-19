@@ -53,7 +53,7 @@ def route_mapping(upackage: str) -> dict:
     css = ['/static/css/'+name
            for name in os.listdir(root_name+'/static/css/')]
     js = ['/static/js/'+name
-           for name in os.listdir(root_name+'/static/js/')]
+          for name in os.listdir(root_name+'/static/js/')]
     for fpath in css+js:
         handlers['GET'][fpath] = StaticFile(root_name+fpath)
     return handlers
