@@ -9,7 +9,7 @@ from .template import StaticFile
 
 class Application:
     def __init__(self, package: str):
-        self.handlers = route_mapping(package) 
+        self.handlers = route_mapping(package)
 
     def build_response(self, request):
         path = request.path
@@ -17,11 +17,11 @@ class Application:
         if path not in handlers:
             return webob.Response(text='Not Found')
         handler = handlers[path]
-        if hasattr(handler, 'mimetype'):
-            mime_type = handler.mimetype
-            return webob.Response(text=handler.response_attached(request),
+        if hasattr(handler.__self__, 'mimetype'):
+            mime_type = handler.__self__.mimetype
+            return webob.Response(text=handler(request),
                                   content_type=mime_type)
-        return webob.Response(text=handler.response_attached(request))
+        return webob.Response(text=handler(request))
 
     def response(self, request):
         return self.build_response(request)
@@ -45,17 +45,36 @@ def route_mapping(upackage: str) -> dict:
             continue
         for obj in module.__dict__.values():
             if hasattr(obj, 'response_attached'):
-                handlers[obj.method][obj.path] = obj
+                handlers[obj.method][obj.path] = obj.response_attached
 
-    root_name = os.path.dirname(package.__file__)
+    root_path = os.path.dirname(package.__file__)
+    handlers['GET'].update(staticfile_route_mapping(root_path))
+    return handlers
 
-    # Mapping static file
-    css = ['/static/css/'+name
-           for name in os.listdir(root_name+'/static/css/')]
-    js = ['/static/js/'+name
-          for name in os.listdir(root_name+'/static/js/')]
-    for fpath in css+js:
-        handlers['GET'][fpath] = StaticFile(root_name+fpath)
+
+def staticfile_route_mapping(root_path):
+    """ Mapping static file
+    The static directory hierarchy:
+
+    ├── static
+    │   ├── css
+    │   │   └── demo.css
+    │   └── js
+    │       └── demo.js
+    └── templates
+        └── index.html
+    """
+    # Will be improved
+    # It should be more customized
+    # and the file search should be more tricky
+    static_dir = 'static/'
+    abspath = os.path.join(root_path, static_dir)
+    static_files = ['/'+static_dir+subdir+'/'+each_file
+                    for subdir in os.listdir(abspath)
+                    for each_file in os.listdir(abspath+subdir)]
+    handlers = {}
+    for fpath in static_files:
+        handlers[fpath] = StaticFile(root_path+fpath).response_attached
     return handlers
 
 
