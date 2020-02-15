@@ -1,7 +1,7 @@
 import sqlite3
 
 
-_db_file = '/home/yixuan/github/webgo/webgo/sqlite.db'
+_db_file = 'sqlite.db'
 
 
 class ModelMetaclass(type):
@@ -27,21 +27,29 @@ class Model(metaclass=ModelMetaclass):
         self.__dict__.update(**kwargs)
 
     @classmethod
-    def create_table(cls):
+    def create_table(cls, mname):
+        conn = sqlite3.connect(_db_file)
+        cur = conn.cursor()
+        for class_ in cls.__subclasses__():
+            if mname == class_.__name__:
+                model = class_
+                break
+        else:
+            raise Exception(f'No { mname } table')
+
         try:
-            conn = sqlite3.connect(_db_file)
-            tables = []
-            for model in cls.__subclasses__():
-                table_name = model.__table__
-                cols = ','.join(
-                        [f'{ c.col_name } { c.col_type }' 
-                           for c in model.__mappings__.values()]
-                    )
-                with conn:
-                    conn.execute(f"CREATE TABLE { table_name } ({ cols })")
-                    tables.append(table_name)
+            cols = ','.join(
+                    [f'{ c.col_name } { c.col_type }'
+                       for c in model.__mappings__.values()]
+            )
+            cur.execute(f"CREATE TABLE { model.__table__ } ({ cols })")
+            table = model.__table__
             conn.commit()
-            print('\n'.join(table_name))
+        except Exception as e:
+            conn.rollback()
+            raise e
+        else:
+            print(f'{ table } created')
         finally:
             conn.close()
             
@@ -64,8 +72,8 @@ class Model(metaclass=ModelMetaclass):
 
     def delete(self):
         sql = f"""
-            delete from { self.__table__ }
-            where id={ self.id }
+            DELETE FROM { self.__table__ }
+            WHERE id={ self.id }
         """
         conn = sqlite3.connect(_db_file)
         with conn:
@@ -120,14 +128,14 @@ class Model(metaclass=ModelMetaclass):
             raise AttributeError(f"There's no column { key }")
         self.__dict__[key] = value
 
+    def __str__(self):
+        return '<%s:%s>' % ('Model', self.__class__.__name__)
+
 
 class _Field:
     def __init__(self, col_name, col_type):
         self.col_name = col_name
         self.col_type = col_type
-
-    def __str__(self):
-        return '<%s:%s>' % (self.__class__.__name__, self.name)
 
 
 class IntegerField(_Field):

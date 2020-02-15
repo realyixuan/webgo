@@ -47,7 +47,8 @@ def route_mapping(upackage: str) -> dict:
             if hasattr(obj, 'response_attached'):
                 handlers[obj.method][obj.path] = obj.response_attached
 
-    root_path = os.path.dirname(package.__file__)
+    # root_path = os.path.dirname(package.__file__)
+    root_path = package.__path__
     handlers['GET'].update(staticfile_route_mapping(root_path))
     return handlers
 
@@ -67,14 +68,17 @@ def staticfile_route_mapping(root_path):
     # Will be improved
     # It should be more customized
     # and the file search should be more tricky
-    static_dir = 'static/'
-    abspath = os.path.join(root_path, static_dir)
-    static_files = ['/'+static_dir+subdir+'/'+each_file
-                    for subdir in os.listdir(abspath)
-                    for each_file in os.listdir(abspath+subdir)]
+    static_dir = 'static'
+    pjoin = os.path.join
+    abspath = pjoin(root_path, static_dir)
+    static_files = (
+        pjoin(pjoin(static_dir, subdir), each_file)
+        for subdir in os.listdir(abspath)
+        for each_file in os.listdir(pjoin(abspath, subdir))
+    )
     handlers = {}
     for fpath in static_files:
-        handlers[fpath] = StaticFile(root_path+fpath).response_attached
+        handlers['/' + fpath] = StaticFile(pjoin(root_path, fpath)).response_attached
     return handlers
 
 
