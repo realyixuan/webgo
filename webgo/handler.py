@@ -1,3 +1,9 @@
+import webob
+from typing import Callable, NewType
+
+Request = NewType('Request', webob.Request)
+
+
 def get(path):
     return _query(path, method='GET')
 
@@ -11,11 +17,11 @@ def _query(path, method):
 
 
 class _Handler:
-    def __init__(self, func, path, method):
+    def __init__(self, func: Callable[[Request], str], path, method):
         self.origin_func = func
         self.path = path
         self.method = method
 
-    def response_attached(self, request):
+    def response_attached(self, request) -> str:
         return self.origin_func(request)
-        
+

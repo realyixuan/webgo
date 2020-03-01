@@ -1,6 +1,9 @@
 *.pyc
+*.db
+*.sqlite
 .idea/
 /demo
 /build
 /dist
 /webgo.egg-info
+.mypy_cache/
