@@ -4,10 +4,29 @@ from webgo.exceptions import FieldError
 from webgo.config import DB_FILE
 
 
+class DBConnect:
+    def __init__(self):
+        self.conn = sqlite3.connect(DB_FILE)
+
+    def __enter__(self):
+        return self.conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.conn.commit()
+        elif issubclass(exc_type, sqlite3.Error):
+            self.conn.rollback()
+            print(f'The DB operation error: {exc_val}')
+        else:
+            print(f'Exception: {exc_val}')
+        self.conn.close()
+        return True
+
+
 class ModelMetaclass(type):
-    def __new__(cls, name, bases, attrs):
+    def __new__(mcs, name, bases, attrs):
         if attrs.get('__abstract__'):
-            return type.__new__(cls, name, bases, attrs)
+            return type.__new__(mcs, name, bases, attrs)
         mappings = {}
         for k, v in attrs.items():
             if isinstance(v, _Field):
@@ -18,7 +37,7 @@ class ModelMetaclass(type):
             attrs.pop(k)
         attrs['__mappings__'] = mappings
         attrs['__table__'] = name
-        return type.__new__(cls, name, bases, attrs)
+        return type.__new__(mcs, name, bases, attrs)
 
 
 class RecordSet:
@@ -32,13 +51,11 @@ class RecordSet:
         cols = list(self.model.__mappings__.keys())
         cols.append('pk')
         colstr = ','.join(cols)
-        conn = sqlite3.connect(DB_FILE)
-        with conn:
+        with DBConnect() as conn:
             row = conn.execute(f"""
                     SELECT {colstr} FROM {self.model.__table__}
                     WHERE pk={pk} 
                 """).fetchone()
-        conn.close()
         return self.model(**dict(zip(cols, row)))
 
     def all(self, **kwargs):
@@ -50,14 +67,12 @@ class RecordSet:
         cols = list(self.model.__mappings__.keys())
         cols.append('pk')
         colstr = ','.join(cols)
-        conn = sqlite3.connect(DB_FILE)
-        with conn:
+        with DBConnect() as conn:
             rows = conn.execute(f"""
                     SELECT {colstr} FROM {self.model.__table__}
                     WHERE {kw}=? 
                 """, (kwargs[kw], )
                                ).fetchall()
-        conn.close()
         return [self.model(**dict(zip(cols, row))) for row in rows]
 
     def create(self, **kwargs):
@@ -74,10 +89,8 @@ class RecordSet:
             INSERT INTO { self.model.__table__ } ({ cols_str })
             VALUES ({ params_str })
         """
-        conn = sqlite3.connect(DB_FILE)
-        with conn:
+        with DBConnect() as conn:
             conn.execute(sql, tuple(args))
-        conn.close()
 
     def _row(self):
         pass
@@ -125,10 +138,8 @@ class Model(metaclass=ModelMetaclass):
             DELETE FROM { self.__table__ }
             WHERE pk={self.pk}
         """
-        conn = sqlite3.connect(DB_FILE)
-        with conn:
+        with DBConnect() as conn:
             conn.execute(sql)
-        conn.close()
 
     def update(self):
         cols = []
@@ -144,10 +155,8 @@ class Model(metaclass=ModelMetaclass):
             set { cols_str }
             where pk={self.pk}
         """
-        conn = sqlite3.connect(DB_FILE)
-        with conn:
+        with DBConnect() as conn:
             conn.execute(sql, tuple(args))
-        conn.close()
 
     def __getattr__(self, key):
         if key not in self.__mappings__:
