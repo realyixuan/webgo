@@ -4,10 +4,10 @@ import types
 import argparse
 from wsgiref.simple_server import make_server
 
-from . import webgoapp
-from .fileoperation import get_abs_path
-from . import config
-from . import orm
+from webgo import webgoapp
+from webgo.fileoperation import get_abs_path
+from webgo import config
+from webgo import orm
 
 
 def serving(Application=webgoapp.Application):

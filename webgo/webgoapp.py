@@ -4,7 +4,7 @@ import inspect
 
 import webob
 
-from .template import StaticFile
+from webgo.template import StaticFile
 
 
 class Application:

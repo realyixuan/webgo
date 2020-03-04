@@ -26,14 +26,27 @@ def test_field_id():
 
 
 def test_cduq(test_client):
-    test_client.objects.create(name='guido', age=1)
-    assert test_client.objects.get(pk=1).name == 'guido'
+    user1 = test_client(name='guido', age=1)
+    user2 = test_client(name='linus', age=2)
+    user3 = test_client(name='turing', age=3)
+    user1.save()
+    user1 = test_client.objects.get(pk=1)
+    assert user1.name == 'guido'
+    assert len(test_client.objects.query()) == 1
 
-    user = test_client.objects.get(pk=1)
-    assert user.age == 1
+    user2.save()
+    user3.save()
 
-    user.age = 20
-    assert user.age == 20
+    user2 = test_client.objects.get(pk=2)
+    assert user2.age == 2
 
-    test_client.objects.get(pk=1).delete()
+    all_user = test_client.objects.query()
+    assert len(all_user) == 3
+    assert user1 in all_user
+
+    user1.delete()
+    assert len(test_client.objects.query()) == 2
+
+    all_user = test_client.objects.query()
+    assert user1 not in all_user
 
