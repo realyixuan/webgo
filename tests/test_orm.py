@@ -15,7 +15,7 @@ def test_client():
     class TestModel(Model):
         name = TextField('name')
         age = IntegerField('age')
-    Model.create_table('TestModel')
+    Model.create_table()
     return TestModel
 
 

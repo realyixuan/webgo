@@ -120,31 +120,24 @@ class Model(metaclass=ModelMetaclass):
         return self._pk
 
     @classmethod
-    def create_table(cls, mname: str):
-        """ Create a table in database
-        :param mname: table model name
-        """
-        conn = sqlite3.connect(DB_FILE)
-        cur = conn.cursor()
-        for class_ in cls.__subclasses__():
-            if mname == class_.__name__:
-                model = class_
-                break
-        else:
-            raise Exception(f'No {mname} table')
-
-        try:
-            cols = ','.join([f'{c.col_name} {c.col_type}' for c in model.__mappings__.values()])
-            cur.execute(f"CREATE TABLE {model.__table__} ({cols})")
-            table = model.__table__
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            raise e
-        else:
-            print(f'{ table } created')
-        finally:
-            conn.close()
+    def create_table(cls):
+        """ Create a table in database """
+        with DBConnect() as conn:
+            get_tables = f"""
+                SELECT NAME
+                FROM sqlite_master
+                WHERE type='table'
+            """
+            tables = set(
+                map(lambda x: x[0], conn.execute(get_tables).fetchall())
+            )
+            for class_ in cls.__subclasses__():
+                if class_.__name__ in tables:
+                    continue
+                cols = ','.join([f'{c.col_name} {c.col_type}'
+                                 for c in class_.__mappings__.values()])
+                conn.execute(f"CREATE TABLE {class_.__table__} ({cols})")
+                print(f'{class_.__table__} created')
 
     def _create(self):
         cols = []
@@ -166,7 +159,6 @@ class Model(metaclass=ModelMetaclass):
                 select pk from {self.__table__} order by pk desc
             """).fetchone()
             self._pk = pk[0]
-
 
     def delete(self):
         sql = f"""
