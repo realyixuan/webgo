@@ -17,6 +17,9 @@ def _query(path, method):
 
 
 class _Handler:
+    """ Handlers wrap functions to provide resource interface
+    They handle requests by calling the underlying functions
+    """
     def __init__(self, func: Callable[[Request], str], path, method):
         self.origin_func = func
         self.path = path

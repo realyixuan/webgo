@@ -15,6 +15,7 @@ def render(request, fname: str, context) -> str:
 
 
 class StaticFile:
+    """ The class provides static file surface """
     def __init__(self, fpath):
         self.fpath = fpath
         self.mimetype, self.encoding = mimetypes.guess_type(self.fpath)

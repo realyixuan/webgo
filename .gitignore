@@ -2,6 +2,7 @@
 *.db
 *.sqlite
 .idea/
+/__main__.py
 /demo
 /build
 /dist

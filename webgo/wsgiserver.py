@@ -10,9 +10,14 @@ from webgo import config
 from webgo import orm
 
 
+
 def serving(Application=webgoapp.Application):
     config.PROJECT_PATH = parse_command_argument()
     package_name = _load_module(config.PROJECT_PATH)
+
+    # Generate all tables mapped by models
+    orm.Model.create_table()
+
     app = Application(package_name)
     
     # Reload file if file modified
@@ -47,11 +52,11 @@ def parse_command_argument():
     parser.add_argument('--migrate', help='migrate your model')
     args = parser.parse_args()
 
-    if args.migrate:
+    # if args.migrate:
         # The operation is somewhat funny!
-        _load_module(get_abs_path(args.project))
-        orm.Model.create_table(args.migrate)
-        sys.exit()
+        # _load_module(get_abs_path(args.project))
+        # orm.Model.create_table(args.migrate)
+        # sys.exit()
 
     return get_abs_path(args.project)
 

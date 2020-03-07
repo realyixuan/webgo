@@ -6,6 +6,7 @@ from webgo.config import DB_FILE
 
 
 class DBConnect:
+    """ DB connection context manager """
     def __init__(self):
         self.conn = sqlite3.connect(DB_FILE)
 
@@ -43,6 +44,13 @@ class ModelMetaclass(type):
 
 
 class RecordSet(abc.Set):
+    """ Create a record set for result of query
+
+    Cause of which it inherit abc.Set:
+        We can perform some operations come from set.
+            '|', '&', ... and so on
+
+    """
     def __init__(self, iterable=None, model=None):
         if iterable:
             self._set = set(iterable)
@@ -52,7 +60,7 @@ class RecordSet(abc.Set):
         return self.__class__(model=class_)
 
     def query(self, **kwargs):
-        # Return a recordset including all specific records of table
+        """ Return a recordset including all specific records of table """
         if len(kwargs) > 1:
             raise KeyError('support search by one key word only')
         if not kwargs:
@@ -66,11 +74,11 @@ class RecordSet(abc.Set):
                     WHERE {kw}=? 
                 """, (kwargs[kw], )
                                 ).fetchall()
-        return self.__class__(self.model(**dict(zip(cols, row)))
-                              for row in rows)
+        return self.__class__(
+            (self.model(**dict(zip(cols, row))) for row in rows), self.model)
 
     def get(self, pk):
-        # Return a single record
+        """ Return a single record which is a instance of class """
         cols = list(self.model.__mappings__.keys())
         colstr = ','.join(cols)
         with DBConnect() as conn:
@@ -94,11 +102,14 @@ class RecordSet(abc.Set):
 
     def __str__(self):
         return '<%s RecorcdSet (%s)>'\
-               % (self.model.__name__, ','.join(map(lambda x: x.pk, self._set)))
+               % (self.model.__name__,
+                  ','.join(map(lambda x: str(x.pk), self._set)))
 
 
 class Model(metaclass=ModelMetaclass):
-
+    """ Base class of all models mapping tables
+    Define all abstract methods interact with DB
+    """
     __abstract__ = True
 
     objects = RecordSet()
@@ -121,7 +132,9 @@ class Model(metaclass=ModelMetaclass):
 
     @classmethod
     def create_table(cls):
-        """ Create a table in database """
+        """ Create a table in database
+        It will create all tables through all base class's subclass
+        """
         with DBConnect() as conn:
             get_tables = f"""
                 SELECT NAME
@@ -137,9 +150,10 @@ class Model(metaclass=ModelMetaclass):
                 cols = ','.join([f'{c.col_name} {c.col_type}'
                                  for c in class_.__mappings__.values()])
                 conn.execute(f"CREATE TABLE {class_.__table__} ({cols})")
-                print(f'{class_.__table__} created')
+                print(f'Table {class_.__table__} created')
 
     def _create(self):
+        """ Create record by instance of class """
         cols = []
         args = []
         params = []
@@ -213,6 +227,7 @@ class Model(metaclass=ModelMetaclass):
 
 
 class _Field:
+    """ Base class of Field class """
     def __init__(self, col_name, col_type):
         self.col_name = col_name
         self.col_type = col_type

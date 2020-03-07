@@ -1,1 +1,1 @@
-document.write("<h1>From JS</h1>");
+document.write("<h1>It works</h1>");

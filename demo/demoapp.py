@@ -2,21 +2,27 @@ from datetime import datetime
 
 from webgo.handler import get, post
 from webgo.template import render
+
 from .model import Exam
 
 
 @post('/')
 def form(request):
     name = request.POST['name']
+    # Create a record
     exam = Exam(name=name, time=str(datetime.now()))
-    exam.create()
-    return 'LOG: ' + exam.name + exam.time
+
+    # Save it to database
+    exam.save()
+
+    # Select all record in 'Exam' table
+    all_rec = Exam.objects.query()
+    return '<br>'.join('LOG: ' + item.name + item.time for item in all_rec)
 
 
 @get('/')
 def static_text(request):
     return render(request, 'demo/templates/index.html', context={
-        'name': 'wow',
-        'value': 'works',
+        'value': 'Login Log',
     })
 

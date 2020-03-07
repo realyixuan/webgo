@@ -8,6 +8,7 @@ from webgo.template import StaticFile
 
 
 class Application:
+    """ Create a WSGI application """
     def __init__(self, package: str):
         self.handlers = route_mapping(package)
 

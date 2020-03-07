@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="webgo",
-    version="0.1",
+    version="0.11",
     author="yixuan",
     author_email="yixuan.coder@gmail.com",
     description="A micro web framework",
@@ -15,11 +15,11 @@ setuptools.setup(
     license='MIT',
     packages=['webgo'],
     install_requires=['webob'],
-    # entry_points={
-    #     'console_scripts': [
-    #         'webgo=webgo.wsgiserver:serving',
-    #     ],
-    # },
+    entry_points={
+        'console_scripts': [
+            'webgo=webgo.wsgiserver:serving',
+        ],
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

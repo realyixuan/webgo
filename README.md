@@ -1,19 +1,105 @@
 # webgo
 
-<img style="float: left;" src="https://img.shields.io/badge/pypi-0.1-green">
+Webgo is a micro web framework.
 
-A micro web framework
+It addresses a couple of problems:
 
-You can imitate the `demo` directory to build your own.
+- Mapping URL to objects
 
-**install and run it**
+- Loading static files
 
-~~~bash
->>> pip install webgo
->>> python -m webgo demo
-Serving demo__main__ ...
+- Performing DB operations through ORM 
+
+## Requirements
+
+Python 3.6+
+
+## Installation
+
+~~~
+$ pip3 install webgo
 ~~~
 
-and access: http://localhost:8080
+## Quickstart
 
-*no more info and try it yourself!*
+*There is a simple implementation in `demo` directory, You can imitate it to build your own.*
+
+**run**
+
+~~~
+# Set your PYTHONPATH='/PARENT_DIR_OF_PROJECT/'
+$ export PYTHONPATH='/PARENT_DIR_OF_PROJECT/'
+$ webgo demo
+~~~
+
+*and access: http://localhost:8080*
+
+*Note: only run it under the same directory as demo*
+
+### More
+
+**Project Structure**
+
+You must construct project structure like this:
+
+And import all `.py` files in `__init__.py`
+
+~~~
+.
+├── __init__.py
+├── app.py
+├── model.py
+├── static
+│   ├── css
+│   │   └── demo.css
+│   └── js
+│       └── demo.js
+└── templates
+    └── index.html
+~~~
+
+**Object Mapping**
+
+You can map any URL to any function.
+
+~~~
+from webgo.handler import get
+
+@get('/')
+def hello(request):
+    return 'hello world'
+~~~
+
+**ORM**
+
+You can save and query data through sqlite by orm.
+
+~~~
+>>> from webgo.orm import IntegerField, TextField, Model
+>>> class Demo(Model): 
+>>>     age = IntegerField('age') 
+>>>     name = TextField('name') 
+
+>>> Model.create_table()                                                
+Table Demo created
+
+>>> one = Demo(age=12, name='Bob')                                          
+
+>>> one.age = 15                                                           
+
+>>>  one.save()                                                             
+
+>>>  one.pk                                                                 
+>>>  1
+
+>>>  one.age                                                               
+>>>  15
+
+>>> Demo(age=10, name='Tom').save()
+
+>>> recset = Demo.objects.query()
+
+>>> print(recset)
+<Demo RecorcdSet (1,2)>
+~~~
+
