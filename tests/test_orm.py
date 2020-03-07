@@ -19,10 +19,17 @@ def test_client():
     return TestModel
 
 
-def test_field_id():
+def test_field_pk_id():
     with pytest.raises(FieldError):
         class User(Model):
             pk = IntegerField('pk')
+
+
+def test_field_init(test_client):
+    with pytest.raises(AttributeError):
+        user = test_client(name='python', gender='male')
+    with pytest.raises(TypeError):
+        user = test_client(name='python', age='11')
 
 
 def test_cduq(test_client):
@@ -30,13 +37,19 @@ def test_cduq(test_client):
     user2 = test_client(name='linus', age=2)
     user3 = test_client(name='turing', age=3)
     user1.save()
+
+    with pytest.raises(AttributeError):
+        user1.pk = 2
+
     user1 = test_client.objects.get(pk=1)
     assert user1.name == 'guido'
     assert len(test_client.objects.query()) == 1
 
+    assert user2.pk is None
     user2.save()
-    user3.save()
+    assert user2.pk == 2
 
+    user3.save()
     user2 = test_client.objects.get(pk=2)
     assert user2.age == 2
 

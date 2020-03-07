@@ -36,6 +36,7 @@ class ModelMetaclass(type):
                 mappings[k] = v
         for k in mappings.keys():
             attrs.pop(k)
+        mappings['pk'] = _Field('pk', 'INTEGER PRIMARY KEY AUTOINCREMENT')
         attrs['__mappings__'] = mappings
         attrs['__table__'] = name
         return type.__new__(mcs, name, bases, attrs)
@@ -58,7 +59,6 @@ class RecordSet(abc.Set):
             kwargs[1] = 1
         kw = list(kwargs.keys())[0]
         cols = list(self.model.__mappings__.keys())
-        cols.append('pk')
         colstr = ','.join(cols)
         with DBConnect() as conn:
             rows = conn.execute(f"""
@@ -72,7 +72,6 @@ class RecordSet(abc.Set):
     def get(self, pk):
         # Return a single record
         cols = list(self.model.__mappings__.keys())
-        cols.append('pk')
         colstr = ','.join(cols)
         with DBConnect() as conn:
             row = conn.execute(f"""
@@ -105,7 +104,20 @@ class Model(metaclass=ModelMetaclass):
     objects = RecordSet()
 
     def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            if key not in self.__mappings__:
+                raise AttributeError(f'{key} does not exist')
+            if not isinstance(value, self.__mappings__[key]._py_type):
+                raise TypeError(f'{key} type is error')
+        pk = None
+        if 'pk' in kwargs:
+            pk = kwargs.pop('pk')
+        kwargs['_pk'] = pk
         self.__dict__.update(**kwargs)
+
+    @property
+    def pk(self):
+        return self._pk
 
     @classmethod
     def create_table(cls, mname: str):
@@ -122,8 +134,7 @@ class Model(metaclass=ModelMetaclass):
             raise Exception(f'No {mname} table')
 
         try:
-            cols = ','.join([f'{c.col_name} {c.col_type}' for c in model.__mappings__.values()])\
-                   + f', pk INTEGER PRIMARY KEY AUTOINCREMENT'
+            cols = ','.join([f'{c.col_name} {c.col_type}' for c in model.__mappings__.values()])
             cur.execute(f"CREATE TABLE {model.__table__} ({cols})")
             table = model.__table__
             conn.commit()
@@ -141,7 +152,7 @@ class Model(metaclass=ModelMetaclass):
         params = []
         for k, v in self.__mappings__.items():
             cols.append(v.col_name)
-            args.append(self.__dict__[k])
+            args.append(getattr(self, k))
             params.append('?')
         cols_str = ','.join(cols)
         params_str = ','.join(params)
@@ -151,6 +162,11 @@ class Model(metaclass=ModelMetaclass):
         """
         with DBConnect() as conn:
             conn.execute(sql, tuple(args))
+            pk = conn.execute(f"""
+                select pk from {self.__table__} order by pk desc
+            """).fetchone()
+            self._pk = pk[0]
+
 
     def delete(self):
         sql = f"""
@@ -161,7 +177,7 @@ class Model(metaclass=ModelMetaclass):
             conn.execute(sql)
 
     def save(self):
-        pk_value = self.__dict__.get('pk')
+        pk_value = self.pk
         if pk_value:
             self._update()
         else:
@@ -173,7 +189,7 @@ class Model(metaclass=ModelMetaclass):
         params = []
         for k, v in self.__mappings__.items():
             cols.append(v.col_name)
-            args.append(self.__dict__[k])
+            args.append(getattr(self, k))
             params.append('?')
         cols_str = ','.join([col+'=?' for col in cols])
         sql = f"""
@@ -189,9 +205,6 @@ class Model(metaclass=ModelMetaclass):
             raise AttributeError(f"There's no attribute { key }")
 
     def __setattr__(self, key, value):
-        # Don't admit to assign value except fields' keys
-        if key not in self.__mappings__:
-            raise AttributeError(f"There's no column { key }")
         super().__setattr__(key, value)
 
     def __eq__(self, other):
@@ -211,6 +224,10 @@ class _Field:
     def __init__(self, col_name, col_type):
         self.col_name = col_name
         self.col_type = col_type
+        self._py_type = {
+            'TEXT': str,
+            'INT': int,
+        }.get(col_type, object)
 
 
 class IntegerField(_Field):
