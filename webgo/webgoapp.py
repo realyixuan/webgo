@@ -66,20 +66,22 @@ def staticfile_route_mapping(root_path):
     └── templates
         └── index.html
     """
-    # Will be improved
-    # It should be more customized
-    # and the file search should be more tricky
+    def _get_all_filepath(path, res: list):
+        # Put all files' path under `path` into res
+        for filename in os.listdir(path):
+            subpath = os.path.join(path, filename)
+            if os.path.isdir(subpath):
+                _get_all_filepath(subpath, res)
+            else:
+                res.append(subpath)
+
     static_dir = 'static'
-    pjoin = os.path.join
-    abspath = pjoin(root_path, static_dir)
-    static_files = (
-        pjoin(pjoin(static_dir, subdir), each_file)
-        for subdir in os.listdir(abspath)
-        for each_file in os.listdir(pjoin(abspath, subdir))
-    )
+    static_path = os.path.join(root_path, static_dir)
+    static_files_path = res = []
+    _get_all_filepath(static_path, res)
     handlers = {}
-    for fpath in static_files:
-        handlers['/' + fpath] = StaticFile(pjoin(root_path, fpath)).response_attached
+    for path in static_files_path:
+        handlers[path[len(root_path):]] = StaticFile(path).response_attached
     return handlers
 
 
