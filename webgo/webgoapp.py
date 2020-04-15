@@ -49,7 +49,7 @@ def route_mapping(upackage: str) -> dict:
                 handlers[obj.method][obj.path] = obj.response_attached
 
     # root_path = os.path.dirname(package.__file__)
-    root_path = package.__path__
+    root_path = package.__path__[0]
     handlers['GET'].update(staticfile_route_mapping(root_path))
     return handlers
 

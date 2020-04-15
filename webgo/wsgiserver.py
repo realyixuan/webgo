@@ -3,6 +3,8 @@ import sys
 import types
 import argparse
 from wsgiref.simple_server import make_server
+from importlib.abc import Loader, MetaPathFinder
+from importlib.util import spec_from_file_location
 
 from webgo import webgoapp
 from webgo.fileoperation import get_abs_path
@@ -10,40 +12,53 @@ from webgo import config
 from webgo import orm
 
 
-
 def serving(Application=webgoapp.Application):
-    config.PROJECT_PATH = parse_command_argument()
-    package_name = _load_module(config.PROJECT_PATH)
+    PROJECT_PATH = parse_command_argument()
+    config.project = config.ProjectParse(PROJECT_PATH)
+
+    sys.meta_path.append(WebgoMetaPathFinder())
 
     # Generate all tables mapped by models
     orm.Model.create_table()
 
-    app = Application(package_name)
+    app = Application(config.project.pkg_name)
     
     # Reload file if file modified
-    app = Reload(app, config.PROJECT_PATH)
+    app = Reload(app, config.project.path)
 
-    print(f'Serving { package_name } ... ')
+    print(f'Serving {config.project.pkg_name} ... ')
     run_server(app)
+
+
+class WebgoMetaPathFinder(MetaPathFinder):
+    def find_spec(self, fullname, path, target=None):
+        modname = config.project.pkg_name
+        location = os.path.join(config.project.path, '__init__.py')
+
+        if fullname == modname:
+            return spec_from_file_location(name=modname,
+                                           location=location,
+                                           loader=WebgoLoader(),
+                                           submodule_search_locations=[config.project.path])
+        else:
+            return None
+
+
+class WebgoLoader(Loader):
+    def create_module(self, spec):
+        return None
+
+    def exec_module(self, module):
+        with open(module.__file__) as f:
+            data = f.read()
+        exec(data, module.__dict__)
+
+    def module_repr(self, module):
+        return NotImplementedError
 
 
 def run_server(app):
     make_server('', 8080, app).serve_forever()
-
-
-def _load_module(project_path: str) -> str:
-    # Maybe the way importing module isn't normal
-    # May there be a good way?
-    project_name = os.path.basename(project_path)
-    mname = project_name + '__main__'
-    module = types.ModuleType(mname)
-    module.__path__ = project_path
-    module.__package__ = project_name
-    module.__file__ = os.path.join(project_path, '__init__.py')
-    with open(module.__file__) as fp:
-        exec(fp.read(), module.__dict__)
-    sys.modules[module.__name__] = module
-    return module.__name__
 
 
 def parse_command_argument():
@@ -71,9 +86,8 @@ class Reload:
     def __call__(self, environ, start_response):
         mtime_now = os.path.getctime(self.project)
         if mtime_now != self.mtime:
-            print(f'Reloading { self.project } ... ')
-            package = _load_module(self.project)
-            self.app.__init__(package)
+            print(f'Reloading {self.project} ... ')
+            self.app.__init__(config.project.pkg_name)
             self.mtime = mtime_now
         return self.app(environ, start_response)
 
