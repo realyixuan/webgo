@@ -27,14 +27,10 @@ $ pip3 install webgo
 **run**
 
 ~~~
-# Set your PYTHONPATH='/PARENT_DIR_OF_PROJECT/'
-$ export PYTHONPATH='/PARENT_DIR_OF_PROJECT/'
 $ webgo demo
 ~~~
 
 *and access: http://localhost:8080*
-
-*Note: only run it under the same directory as demo*
 
 ### More
 

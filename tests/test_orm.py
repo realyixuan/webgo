@@ -4,8 +4,6 @@ import sqlite3
 
 from webgo import config
 
-# TODO: There are some error, I think!
-config.DB_FILE="/home/yixuan/github/webgo/tests/files/sqlite.db"
 from webgo.exceptions import FieldError
 from webgo.orm import Model, IntegerField, TextField
 
