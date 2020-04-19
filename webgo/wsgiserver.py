@@ -16,10 +16,8 @@ def serving(Application=webgoapp.Application):
     PROJECT_PATH = parse_command_argument()
     config.project = config.ProjectParse(PROJECT_PATH)
 
+    # package import strategy
     sys.meta_path.append(WebgoMetaPathFinder())
-
-    # Generate all tables mapped by models
-    orm.Model.create_table()
 
     app = Application(config.project.pkg_name)
     

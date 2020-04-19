@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="webgo",
-    version="0.12",
+    version="0.12.1",
     author="yixuan",
     author_email="yixuan.coder@gmail.com",
     description="A micro web framework",
