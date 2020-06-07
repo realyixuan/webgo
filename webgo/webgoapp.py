@@ -56,29 +56,40 @@ def route_mapping(upackage: str) -> dict:
 
 def staticfile_route_mapping(root_path):
     """ Mapping static file
-    The static directory hierarchy:
+    The static directory hierarchy could be like this:
+    ( The hierarchy is arbitrary,
+     and 'static' directory is optional )
 
-    ├── static
-    │   ├── css
-    │   │   └── demo.css
-    │   └── js
-    │       └── demo.js
-    └── templates
-        └── index.html
+    .
+    │── static
+        ├── css
+        │   └── demo.css
+        └── js
+            └── demo.js
     """
-    def _get_all_filepath(path, res: list):
-        # Put all files' path under `path` into res
-        for filename in os.listdir(path):
-            subpath = os.path.join(path, filename)
-            if os.path.isdir(subpath):
-                _get_all_filepath(subpath, res)
-            else:
-                res.append(subpath)
+    def _get_static(res: list):
+        # If 'static' directory is exists
+        # Put all files' path under ``path`` into ``res``
 
-    static_dir = 'static'
-    static_path = os.path.join(root_path, static_dir)
+        static_dir = 'static'
+        static_path = os.path.join(root_path, static_dir)
+
+        if not os.path.exists(static_path):
+            return None
+
+        def _get_all_filepath(path):
+            for filename in os.listdir(path):
+                subpath = os.path.join(path, filename)
+                if os.path.isdir(subpath):
+                    _get_all_filepath(subpath)
+                else:
+                    res.append(subpath)
+        _get_all_filepath(path=static_path)
+
+    # get all static file path
     static_files_path = res = []
-    _get_all_filepath(static_path, res)
+    _get_static(res)
+
     handlers = {}
     for path in static_files_path:
         handlers[path[len(root_path):]] = StaticFile(path).response_attached
