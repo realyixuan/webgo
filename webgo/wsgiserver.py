@@ -18,11 +18,11 @@ def serving(Application=webgoapp.Application):
 
     sys.meta_path.append(WebgoMetaPathFinder())
 
+    app = Application(config.project.pkg_name)
+
     # Generate all tables mapped by models
     orm.Model.create_table()
 
-    app = Application(config.project.pkg_name)
-    
     # Reload file if file modified
     app = Reload(app, config.project.path)
 
