@@ -22,7 +22,7 @@ def form(request):
 
 @get('/')
 def static_text(request):
-    return render(request, 'demo/templates/index.html', context={
+    return render(request, 'index.html', context={
         'value': 'Login Log',
     })
 

@@ -7,7 +7,7 @@ from importlib.abc import Loader, MetaPathFinder
 from importlib.util import spec_from_file_location
 
 from webgo import webgoapp
-from webgo.fileoperation import get_abs_path
+from webgo.template import get_abs_path
 from webgo import config
 from webgo import orm
 
