@@ -32,6 +32,8 @@ $ webgo demo
 
 *and access: http://localhost:8080*
 
+*note: the work directory must be the same as project*
+
 ### More
 
 **Project Structure**

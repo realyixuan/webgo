@@ -9,7 +9,6 @@ from importlib.util import spec_from_file_location
 from webgo import webgoapp
 from webgo.template import get_abs_path
 from webgo import config
-from webgo import orm
 
 
 def serving(Application=webgoapp.Application):
@@ -19,9 +18,6 @@ def serving(Application=webgoapp.Application):
     sys.meta_path.append(WebgoMetaPathFinder())
 
     app = Application(config.project.pkg_name)
-
-    # Generate all tables mapped by models
-    orm.Model.create_table()
 
     # Reload file if file modified
     app = Reload(app, config.project.path)

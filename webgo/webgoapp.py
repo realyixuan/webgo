@@ -5,6 +5,7 @@ import inspect
 import webob
 
 from webgo.template import StaticFile
+from webgo import orm
 
 
 class Application:
@@ -41,6 +42,10 @@ def route_mapping(upackage: str) -> dict:
         'POST': {},
         }
     package = _import(upackage)
+
+    # Generate all tables mapped by models
+    orm.Model.create_table()
+
     for module in package.__dict__.values():
         if not hasattr(module, '__dict__'):
             continue
