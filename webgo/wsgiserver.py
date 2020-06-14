@@ -1,14 +1,17 @@
 import os
 import sys
 import types
+import logging
 import argparse
 from wsgiref.simple_server import make_server
 from importlib.abc import Loader, MetaPathFinder
 from importlib.util import spec_from_file_location
 
+from webgo import config
 from webgo import webgoapp
 from webgo.template import get_abs_path
-from webgo import config
+
+logger = logging.getLogger(__name__)
 
 
 def serving(Application=webgoapp.Application):
@@ -22,7 +25,8 @@ def serving(Application=webgoapp.Application):
     # Reload file if file modified
     app = Reload(app, config.project.path)
 
-    print(f'Serving {config.project.pkg_name} ... ')
+    logger.info(f'Serving {config.project.pkg_name} ... ')
+
     run_server(app)
 
 
@@ -82,7 +86,7 @@ class Reload:
     def __call__(self, environ, start_response):
         mtime_now = os.path.getctime(self.project)
         if mtime_now != self.mtime:
-            print(f'Reloading {self.project} ... ')
+            logger.info(f'Reloading {self.project} ... ')
             self.app.__init__(config.project.pkg_name)
             self.mtime = mtime_now
         return self.app(environ, start_response)

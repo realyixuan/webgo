@@ -1,4 +1,11 @@
 import os
+import logging
+
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+)
 
 DB_FILE = 'sqlite.db'
 

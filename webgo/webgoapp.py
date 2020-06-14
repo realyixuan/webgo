@@ -1,11 +1,14 @@
 import os
 import importlib
 import inspect
+import logging
 
 import webob
 
 from webgo.template import StaticFile
 from webgo import orm
+
+logger = logging.getLogger(__name__)
 
 
 class Application:
@@ -37,6 +40,9 @@ class Application:
 
 
 def route_mapping(upackage: str) -> dict:
+
+    logger.debug('mapping route to object')
+
     handlers = {
         'GET': {},
         'POST': {},
@@ -72,6 +78,9 @@ def staticfile_route_mapping(root_path):
         └── js
             └── demo.js
     """
+
+    logger.debug('mapping static files')
+
     def _get_static(res: list):
         # If 'static' directory is exists
         # Put all files' path under ``path`` into ``res``

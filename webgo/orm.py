@@ -1,8 +1,11 @@
 import sqlite3
+import logging
 from collections import abc
 
 from webgo.exceptions import FieldError
 from webgo.config import DB_FILE
+
+logger = logging.getLogger(__name__)
 
 
 class DBConnect:
@@ -18,9 +21,9 @@ class DBConnect:
             self.conn.commit()
         elif issubclass(exc_type, sqlite3.Error):
             self.conn.rollback()
-            print(f'The DB operation error: {exc_val}')
+            logger.warning(f'The DB operation error: {exc_val}', exc_info=True)
         else:
-            print(f'Exception: {exc_val}')
+            logger.warning(f'Exception: {exc_val}', exc_info=True)
         self.conn.close()
         return True
 
@@ -150,7 +153,7 @@ class Model(metaclass=ModelMetaclass):
                 cols = ','.join([f'{c.col_name} {c.col_type}'
                                  for c in class_.__mappings__.values()])
                 conn.execute(f"CREATE TABLE {class_.__table__} ({cols})")
-                print(f'Table {class_.__table__} created')
+                logger.info(f'Table {class_.__table__} created')
 
     def _create(self):
         """ Create record by instance of class """
