@@ -28,19 +28,25 @@ class DBConnect:
         return True
 
 
+class NewId:
+    """ pseudo-id for new record """
+    def __bool__(self):
+        return False
+
+
 class ModelMetaclass(type):
     def __new__(mcs, name, bases, attrs):
         if attrs.get('__abstract__'):
             return type.__new__(mcs, name, bases, attrs)
         mappings = {}
         for k, v in attrs.items():
-            if isinstance(v, _Field):
+            if isinstance(v, Field):
                 if k == 'pk':
                     raise FieldError("Can't define Field named 'pk'")
                 mappings[k] = v
         for k in mappings.keys():
             attrs.pop(k)
-        mappings['pk'] = _Field('pk', 'INTEGER PRIMARY KEY AUTOINCREMENT')
+        mappings['pk'] = Field('pk', 'INTEGER PRIMARY KEY AUTOINCREMENT')
         attrs['__mappings__'] = mappings
         attrs['__table__'] = name
         return type.__new__(mcs, name, bases, attrs)
@@ -78,7 +84,9 @@ class RecordSet(abc.Set):
                 """, (kwargs[kw], )
                                 ).fetchall()
         return self.__class__(
-            (self.model(**dict(zip(cols, row))) for row in rows), self.model)
+            (self.model(**dict(zip(cols, row))) for row in rows),
+            self.model
+        )
 
     def get(self, pk):
         """ Return a single record which is a instance of class """
@@ -104,9 +112,13 @@ class RecordSet(abc.Set):
         return len(self._set)
 
     def __str__(self):
-        return '<%s RecorcdSet (%s)>'\
-               % (self.model.__name__,
-                  ','.join(map(lambda x: str(x.pk), self._set)))
+        return (
+                '<%s RecorcdSet (%s)>'
+               % (
+                    self.model.__name__,
+                    ','.join(map(lambda x: str(x.pk), self._set))
+                )
+        )
 
 
 class Model(metaclass=ModelMetaclass):
@@ -123,7 +135,7 @@ class Model(metaclass=ModelMetaclass):
                 raise AttributeError(f'{key} does not exist')
             if not isinstance(value, self.__mappings__[key]._py_type):
                 raise TypeError(f'{key} type is error')
-        pk = None
+        pk = NewId()
         if 'pk' in kwargs:
             pk = kwargs.pop('pk')
         kwargs['_pk'] = pk
@@ -229,7 +241,7 @@ class Model(metaclass=ModelMetaclass):
         return '<%s:%s # pk=%s>' % ('Model', self.__class__.__name__, self.pk)
 
 
-class _Field:
+class Field:
     """ Base class of Field class """
     def __init__(self, col_name, col_type):
         self.col_name = col_name
@@ -240,12 +252,12 @@ class _Field:
         }.get(col_type, object)
 
 
-class IntegerField(_Field):
+class IntegerField(Field):
     def __init__(self, col_name):
         super().__init__(col_name, 'INT')
 
 
-class TextField(_Field):
+class TextField(Field):
     def __init__(self, col_name):
         super().__init__(col_name, 'TEXT')
 
