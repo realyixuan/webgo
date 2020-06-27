@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from webgo.handler import get, post
@@ -26,3 +27,8 @@ def static_text(request):
         'value': 'Login Log',
     })
 
+
+@get('/hello')
+def hello(request):
+    time.sleep(1)
+    return 'Hello World'

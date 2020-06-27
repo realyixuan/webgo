@@ -3,7 +3,8 @@ import sys
 import types
 import logging
 import argparse
-from wsgiref.simple_server import make_server
+from multiprocessing.pool import ThreadPool
+from wsgiref.simple_server import WSGIServer, WSGIRequestHandler
 from importlib.abc import Loader, MetaPathFinder
 from importlib.util import spec_from_file_location
 
@@ -30,16 +31,51 @@ def serving(Application=webgoapp.Application):
     run_server(app)
 
 
+def run_server(app):
+    make_server('', 8080, app).serve_forever()
+
+
+class TheadPoolWSGIServer(WSGIServer):
+    def __init__(self, workers, *args, **kwargs):
+        WSGIServer.__init__(self, *args, **kwargs)
+        self.workers = workers
+        self.pool = ThreadPool(self.workers)
+
+    def process_request(self, request, client_address):
+        self.pool.apply_async(
+            WSGIServer.process_request,
+            args=(self, request, client_address)
+        )
+
+
+def make_server(
+        host,
+        port,
+        app,
+        handler_class=WSGIRequestHandler,
+        workers=8
+):
+    httpd = TheadPoolWSGIServer(
+        workers=workers,
+        server_address=(host, port),
+        RequestHandlerClass=handler_class
+    )
+    httpd.set_app(app)
+    return httpd
+
+
 class WebgoMetaPathFinder(MetaPathFinder):
     def find_spec(self, fullname, path, target=None):
         modname = config.project.pkg_name
         location = os.path.join(config.project.path, '__init__.py')
 
         if fullname == modname:
-            return spec_from_file_location(name=modname,
-                                           location=location,
-                                           loader=WebgoLoader(),
-                                           submodule_search_locations=[config.project.path])
+            return spec_from_file_location(
+                name=modname,
+                location=location,
+                loader=WebgoLoader(),
+                submodule_search_locations=[config.project.path]
+            )
         else:
             return None
 
@@ -55,10 +91,6 @@ class WebgoLoader(Loader):
 
     def module_repr(self, module):
         return NotImplementedError
-
-
-def run_server(app):
-    make_server('', 8080, app).serve_forever()
 
 
 def parse_command_argument():
@@ -90,5 +122,3 @@ class Reload:
             self.app.__init__(config.project.pkg_name)
             self.mtime = mtime_now
         return self.app(environ, start_response)
-
-
