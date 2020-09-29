@@ -8,6 +8,13 @@ from webgo.config import DB_FILE
 logger = logging.getLogger(__name__)
 
 
+class SQLExecute:
+    """
+    Customize sql execute class on my behalf
+    """
+    pass
+
+
 class DBConnect:
     """ DB connection context manager """
     def __init__(self):
