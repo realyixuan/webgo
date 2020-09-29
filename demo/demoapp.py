@@ -9,6 +9,7 @@ from .model import Exam
 @post('/')
 def form(request):
     name = request.POST['name']
+    return name + '\r\n'
     # Create a record
     exam = Exam(name=name, time=str(datetime.now()))
 
