@@ -1,9 +1,12 @@
 import sqlite3
+import threading
 import logging
 from collections import abc
 
 from webgo.exceptions import FieldError
 from webgo.config import DB_FILE
+
+lock = threading.Lock()
 
 logger = logging.getLogger(__name__)
 
@@ -201,19 +204,21 @@ class Model(metaclass=ModelMetaclass):
             self._pk = pk[0]
 
     def delete(self):
-        sql = f"""
-            DELETE FROM { self.__table__ }
-            WHERE pk={self.pk}
-        """
-        with DBConnect() as conn:
-            conn.execute(sql)
+        with lock:
+            sql = f"""
+                DELETE FROM { self.__table__ }
+                WHERE pk={self.pk}
+            """
+            with DBConnect() as conn:
+                conn.execute(sql)
 
     def save(self):
-        pk_value = self.pk
-        if pk_value:
-            self._update()
-        else:
-            self._create()
+        with lock:
+            pk_value = self.pk
+            if pk_value:
+                self._update()
+            else:
+                self._create()
 
     def _update(self):
         cols = []
