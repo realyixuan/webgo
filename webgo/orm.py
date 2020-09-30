@@ -8,17 +8,27 @@ from webgo.config import DB_FILE
 logger = logging.getLogger(__name__)
 
 
-class SQLExecute:
+class MyConnection(sqlite3.Connection):
     """
     Customize sql execute class on my behalf
     """
-    pass
+    def cursor(self, *args, **kwargs):
+        return super().cursor(MyCursor)
+
+
+class MyCursor(sqlite3.Cursor):
+    def execute(self, *args, **kwargs):
+        if len(args) == 1:
+            return super().execute(*args, **kwargs)
+        sql, values = args
+        values = tuple(map(lambda x: None if isinstance(x, NewId) else x, values))
+        return super().execute(sql, values)
 
 
 class DBConnect:
     """ DB connection context manager """
     def __init__(self):
-        self.conn = sqlite3.connect(DB_FILE)
+        self.conn = sqlite3.connect(DB_FILE, factory=MyConnection)
 
     def __enter__(self):
         return self.conn
@@ -119,13 +129,7 @@ class RecordSet(abc.Set):
         return len(self._set)
 
     def __str__(self):
-        return (
-                '<%s RecorcdSet (%s)>'
-               % (
-                    self.model.__name__,
-                    ','.join(map(lambda x: str(x.pk), self._set))
-                )
-        )
+        return '<%s RecorcdSet (%s)>' % (self.model.__name__, ','.join(map(lambda x: str(x.pk), self._set)))
 
 
 class Model(metaclass=ModelMetaclass):
