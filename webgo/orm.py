@@ -53,6 +53,9 @@ class NewId:
     def __bool__(self):
         return False
 
+    def __str__(self):
+        return self.__class__.__name__
+
 
 class ModelMetaclass(type):
     def __new__(mcs, name, bases, attrs):
@@ -68,7 +71,7 @@ class ModelMetaclass(type):
             attrs.pop(k)
         mappings['pk'] = Field('pk', 'INTEGER PRIMARY KEY AUTOINCREMENT')
         attrs['__mappings__'] = mappings
-        attrs['__table__'] = name
+        attrs['__table__'] = name.lower()
         return type.__new__(mcs, name, bases, attrs)
 
 
@@ -78,6 +81,16 @@ class RecordSet(abc.Set):
     Cause of which it inherit abc.Set:
         We can perform some operations come from set.
             '|', '&', ... and so on
+
+    Operations:
+        >>> recset = MyModel.objects.query()
+        >>> print(recest)
+        <MyModel RecorcdSet (1,2,...)>
+
+        >>> rec = MyModel.objects.get(pk=1)
+        >>> print(rec)
+        <Model:MyModel>
+
 
     """
     def __init__(self, iterable=None, model=None):
@@ -109,7 +122,8 @@ class RecordSet(abc.Set):
         )
 
     def get(self, pk):
-        """ Return a single record which is a instance of class """
+        """ Return a single record
+         (which is a instance of Model class) """
         cols = list(self.model.__mappings__.keys())
         colstr = ','.join(cols)
         with DBConnect() as conn:
@@ -134,16 +148,26 @@ class RecordSet(abc.Set):
     def __str__(self):
         return '<%s RecorcdSet (%s)>' % (self.model.__name__, ','.join(map(lambda x: str(x.pk), self._set)))
 
+    __repr__ = __str__
+
 
 class Model(metaclass=ModelMetaclass):
     """ Base class of all models mapping tables
     Define all abstract methods interact with DB
+
+    class attrs:
+        __abstract__ : don't create table in DB if True
+        __table__    : the name of relative table (which is lowercase of class name)
+        __mapping__  : dict that stores all models' field name-field object paris
+
     """
     __abstract__ = True
 
     objects = RecordSet()
 
     def __init__(self, **kwargs):
+        # It can do initializing pk at here, but which is forbidden
+        # So it may be problematic
         for key, value in kwargs.items():
             if key not in self.__mappings__:
                 raise AttributeError(f'{key} does not exist')
@@ -281,4 +305,3 @@ class TextField(Field):
 class User(Model):
     name = TextField('name')
     age = IntegerField('age')
-
