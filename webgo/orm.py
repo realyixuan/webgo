@@ -131,8 +131,7 @@ class RecordSet(abc.Set):
         )
 
     def get(self, pk):
-        """ Return a single record
-         (which is a instance of Model class) """
+        """ Return a single record """
         cols = list(self.model.__fields__.keys())
         colstr = ','.join(cols)
         with DBConnect() as conn:
@@ -187,7 +186,7 @@ class Model(metaclass=ModelMetaclass):
             pk = NewId()
             kwargs['pk'] = pk
         for k, v in kwargs.items():
-            self.__fields__[k].col_value = v
+            self.__fields__[k].__set__(self, v)
 
     @property
     def pk(self):
@@ -211,7 +210,7 @@ class Model(metaclass=ModelMetaclass):
                 if class_.__name__.lower() in tables:
                     continue
                 cols = ','.join([f'{field.col_name} {field.col_type}'
-                                 for _, field in class_.__fields__])
+                                 for field in class_.__fields__.values()])
                 conn.execute(f"CREATE TABLE {class_.__table__} ({cols})")
                 logger.info(f'Table {class_.__table__} created')
 
@@ -222,7 +221,7 @@ class Model(metaclass=ModelMetaclass):
         params = []
         for k, v in self.__fields__.items():
             cols.append(v.col_name)
-            args.append(v.col_value)
+            args.append(self.__dict__[k])
             params.append('?')
         cols_str = ','.join(cols)
         params_str = ','.join(params)
@@ -235,7 +234,7 @@ class Model(metaclass=ModelMetaclass):
             pk = conn.execute(f"""
                 select pk from {self.__table__} order by pk desc
             """).fetchone()
-            self.__fields__['pk'].col_value = pk[0]
+            self.__fields__['pk'].__set__(self, pk[0])
 
     def delete(self):
         with lock:
@@ -258,9 +257,9 @@ class Model(metaclass=ModelMetaclass):
         cols = []
         args = []
         params = []
-        for k, v in self.__mappings__.items():
+        for k, v in self.__fields__.items():
             cols.append(v.col_name)
-            args.append(v.col_value)
+            args.append(self.__dict__[k])
             params.append('?')
         cols_str = ','.join([col+'=?' for col in cols])
         sql = f"""
@@ -271,16 +270,13 @@ class Model(metaclass=ModelMetaclass):
         with DBConnect() as conn:
             conn.execute(sql, tuple(args))
 
-    # def __getattribute__(self, key):
-    #     return object.__getattribute__(self, key)
-
     def __getattr__(self, key):
         if key not in self.__fields__:
             raise AttributeError(f"There's no attribute { key }")
 
     def __setattr__(self, key, value):
         if key not in self.__fields__:
-            raise FieldError(f"No such the key {key}")
+            raise FieldError(f"No such the field {key}")
         super().__setattr__(key, value)
 
     def __eq__(self, other):
@@ -290,17 +286,15 @@ class Model(metaclass=ModelMetaclass):
         return self.pk
 
     def __str__(self):
-        return '<%s:%s>' % ('Model', self.__class__.__name__)
-
-    def __repr__(self):
         return '<%s:%s # pk=%s>' % ('Model', self.__class__.__name__, self.pk)
+
+    __repr__ = __str__
 
 
 class Field:
     """ Base class of Field class """
-    def __init__(self, col_type, col_value=None, col_name=None):
+    def __init__(self, col_type, col_name=None):
         self.col_type = col_type
-        self.col_value = col_value
         self.col_name = col_name
         self.py_type = {
             'text': str,
@@ -311,10 +305,10 @@ class Field:
     def __get__(self, inst, class_):
         if inst is None:
             return self
-        return self.col_value
+        return inst.__dict__[self.col_name]
 
     def __set__(self, inst, value):
-        self.col_value = value
+        inst.__dict__[self.col_name] = value
 
 
 class IntegerField(Field):
@@ -336,7 +330,8 @@ class Many2one(Field):
         if inst is None:
             return self
         related_class = inst.__models__[self.related_model]
-        return related_class.objects.get(pk=self.col_value)
+        value = inst.__dict__[self.col_name]
+        return related_class.objects.get(pk=value)
 
 
 class User(Model):
