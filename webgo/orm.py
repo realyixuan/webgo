@@ -58,21 +58,30 @@ class NewId:
 
 
 class ModelMetaclass(type):
+
+    models = {}
+
     def __new__(mcs, name, bases, attrs):
         if attrs.get('__abstract__'):
+            attrs['__models__'] = mcs.models
             return type.__new__(mcs, name, bases, attrs)
-        mappings = {}
+        __fields__ = {}
         for k, v in attrs.items():
             if isinstance(v, Field):
                 if k == 'pk':
                     raise FieldError("Can't define Field named 'pk'")
-                mappings[k] = v
-        for k in mappings.keys():
-            attrs.pop(k)
-        mappings['pk'] = Field('pk', 'INTEGER PRIMARY KEY AUTOINCREMENT')
-        attrs['__mappings__'] = mappings
+                v.col_name = k
+                __fields__[k] = v
+
+        __fields__['pk'] = Field(col_type='INTEGER PRIMARY KEY AUTOINCREMENT',
+                                 col_name='pk')
+        attrs['__fields__'] = __fields__
         attrs['__table__'] = name.lower()
-        return type.__new__(mcs, name, bases, attrs)
+        attrs['_pk'] = __fields__['pk']
+
+        model = type.__new__(mcs, name, bases, attrs)
+        mcs.models[name] = model
+        return model
 
 
 class RecordSet(abc.Set):
@@ -108,7 +117,7 @@ class RecordSet(abc.Set):
         if not kwargs:
             kwargs[1] = 1
         kw = list(kwargs.keys())[0]
-        cols = list(self.model.__mappings__.keys())
+        cols = list(self.model.__fields__.keys())
         colstr = ','.join(cols)
         with DBConnect() as conn:
             rows = conn.execute(f"""
@@ -124,7 +133,7 @@ class RecordSet(abc.Set):
     def get(self, pk):
         """ Return a single record
          (which is a instance of Model class) """
-        cols = list(self.model.__mappings__.keys())
+        cols = list(self.model.__fields__.keys())
         colstr = ','.join(cols)
         with DBConnect() as conn:
             row = conn.execute(f"""
@@ -158,8 +167,8 @@ class Model(metaclass=ModelMetaclass):
     class attrs:
         __abstract__ : don't create table in DB if True
         __table__    : the name of relative table (which is lowercase of class name)
-        __mapping__  : dict that stores all models' field name-field object paris
-
+        __fields__  : dict that stores all models' field name-object paris
+        __models__   : dict to store all name-class pairs of subclass of Model
     """
     __abstract__ = True
 
@@ -169,15 +178,16 @@ class Model(metaclass=ModelMetaclass):
         # It can do initializing pk at here, but which is forbidden
         # So it may be problematic
         for key, value in kwargs.items():
-            if key not in self.__mappings__:
+            if key not in self.__fields__:
                 raise AttributeError(f'{key} does not exist')
-            if not isinstance(value, self.__mappings__[key]._py_type):
+            if value is not None\
+                    and not isinstance(value, self.__fields__[key].py_type):
                 raise TypeError(f'{key} type is error')
-        pk = NewId()
-        if 'pk' in kwargs:
-            pk = kwargs.pop('pk')
-        kwargs['_pk'] = pk
-        self.__dict__.update(**kwargs)
+        if 'pk' not in kwargs:
+            pk = NewId()
+            kwargs['pk'] = pk
+        for k, v in kwargs.items():
+            self.__fields__[k].col_value = v
 
     @property
     def pk(self):
@@ -198,10 +208,10 @@ class Model(metaclass=ModelMetaclass):
                 map(lambda x: x[0], conn.execute(get_tables).fetchall())
             )
             for class_ in cls.__subclasses__():
-                if class_.__name__ in tables:
+                if class_.__name__.lower() in tables:
                     continue
-                cols = ','.join([f'{c.col_name} {c.col_type}'
-                                 for c in class_.__mappings__.values()])
+                cols = ','.join([f'{field.col_name} {field.col_type}'
+                                 for _, field in class_.__fields__])
                 conn.execute(f"CREATE TABLE {class_.__table__} ({cols})")
                 logger.info(f'Table {class_.__table__} created')
 
@@ -210,9 +220,9 @@ class Model(metaclass=ModelMetaclass):
         cols = []
         args = []
         params = []
-        for k, v in self.__mappings__.items():
+        for k, v in self.__fields__.items():
             cols.append(v.col_name)
-            args.append(getattr(self, k))
+            args.append(v.col_value)
             params.append('?')
         cols_str = ','.join(cols)
         params_str = ','.join(params)
@@ -225,7 +235,7 @@ class Model(metaclass=ModelMetaclass):
             pk = conn.execute(f"""
                 select pk from {self.__table__} order by pk desc
             """).fetchone()
-            self._pk = pk[0]
+            self.__fields__['pk'].col_value = pk[0]
 
     def delete(self):
         with lock:
@@ -250,7 +260,7 @@ class Model(metaclass=ModelMetaclass):
         params = []
         for k, v in self.__mappings__.items():
             cols.append(v.col_name)
-            args.append(getattr(self, k))
+            args.append(v.col_value)
             params.append('?')
         cols_str = ','.join([col+'=?' for col in cols])
         sql = f"""
@@ -261,11 +271,16 @@ class Model(metaclass=ModelMetaclass):
         with DBConnect() as conn:
             conn.execute(sql, tuple(args))
 
+    # def __getattribute__(self, key):
+    #     return object.__getattribute__(self, key)
+
     def __getattr__(self, key):
-        if key not in self.__mappings__:
+        if key not in self.__fields__:
             raise AttributeError(f"There's no attribute { key }")
 
     def __setattr__(self, key, value):
+        if key not in self.__fields__:
+            raise FieldError(f"No such the key {key}")
         super().__setattr__(key, value)
 
     def __eq__(self, other):
@@ -283,25 +298,47 @@ class Model(metaclass=ModelMetaclass):
 
 class Field:
     """ Base class of Field class """
-    def __init__(self, col_name, col_type):
-        self.col_name = col_name
+    def __init__(self, col_type, col_value=None, col_name=None):
         self.col_type = col_type
-        self._py_type = {
-            'TEXT': str,
-            'INT': int,
+        self.col_value = col_value
+        self.col_name = col_name
+        self.py_type = {
+            'text': str,
+            'int': int,
+            'many2one': int,
         }.get(col_type, object)
+
+    def __get__(self, inst, class_):
+        if inst is None:
+            return self
+        return self.col_value
+
+    def __set__(self, inst, value):
+        self.col_value = value
 
 
 class IntegerField(Field):
-    def __init__(self, col_name):
-        super().__init__(col_name, 'INT')
+    def __init__(self, **kwargs):
+        super().__init__('int', **kwargs)
 
 
 class TextField(Field):
-    def __init__(self, col_name):
-        super().__init__(col_name, 'TEXT')
+    def __init__(self, **kwargs):
+        super().__init__('text', **kwargs)
+
+
+class Many2one(Field):
+    def __init__(self, related_model, **kwargs):
+        self.related_model = related_model
+        super().__init__('many2one', **kwargs)
+
+    def __get__(self, inst, class_):
+        if inst is None:
+            return self
+        related_class = inst.__models__[self.related_model]
+        return related_class.objects.get(pk=self.col_value)
 
 
 class User(Model):
-    name = TextField('name')
-    age = IntegerField('age')
+    name = TextField()
+    age = IntegerField()
