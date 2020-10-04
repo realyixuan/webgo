@@ -188,10 +188,6 @@ class Model(metaclass=ModelMetaclass):
         for k, v in kwargs.items():
             self.__fields__[k].__set__(self, v)
 
-    @property
-    def pk(self):
-        return self._pk
-
     @classmethod
     def create_table(cls):
         """ Create a table in database
@@ -221,7 +217,7 @@ class Model(metaclass=ModelMetaclass):
         params = []
         for k, v in self.__fields__.items():
             cols.append(v.col_name)
-            args.append(self.__dict__[k])
+            args.append(self.col_value[k])
             params.append('?')
         cols_str = ','.join(cols)
         params_str = ','.join(params)
@@ -259,7 +255,7 @@ class Model(metaclass=ModelMetaclass):
         params = []
         for k, v in self.__fields__.items():
             cols.append(v.col_name)
-            args.append(self.__dict__[k])
+            args.append(self.col_value[k])
             params.append('?')
         cols_str = ','.join([col+'=?' for col in cols])
         sql = f"""
@@ -269,6 +265,14 @@ class Model(metaclass=ModelMetaclass):
         """
         with DBConnect() as conn:
             conn.execute(sql, tuple(args))
+
+    @property
+    def pk(self):
+        return self._pk
+
+    @property
+    def col_value(self):
+        return self.__dict__
 
     def __getattr__(self, key):
         if key not in self.__fields__:
@@ -305,10 +309,10 @@ class Field:
     def __get__(self, inst, class_):
         if inst is None:
             return self
-        return inst.__dict__[self.col_name]
+        return inst.col_value[self.col_name]
 
     def __set__(self, inst, value):
-        inst.__dict__[self.col_name] = value
+        inst.col_value[self.col_name] = value
 
 
 class IntegerField(Field):
@@ -330,7 +334,7 @@ class Many2one(Field):
         if inst is None:
             return self
         related_class = inst.__models__[self.related_model]
-        value = inst.__dict__[self.col_name]
+        value = inst.col_value[self.col_name]
         return related_class.objects.get(pk=value)
 
 
