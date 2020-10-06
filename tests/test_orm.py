@@ -1,65 +1,130 @@
 import os
-import pytest
-import sqlite3
+import unittest
+import tempfile
+import logging
 
 from webgo import config
+from webgo import orm
 
 from webgo.exceptions import FieldError
-from webgo.orm import Model, IntegerField, TextField
+from webgo.orm import (
+    Model, IntegerField, TextField, Many2one, User, NewId
+)
+
+# orm.logger.disabled = True
+logging.disable(logging.CRITICAL)
+
+ORIGINAL_DB_PATH = config.DB_FILE
 
 
-@pytest.fixture(scope='module')
-def test_client():
-    if os.path.exists(config.DB_FILE):
-        os.remove(config.DB_FILE)
-    class TestModel(Model):
-        name = TextField('name')
-        age = IntegerField('age')
-    Model.create_table()
-    return TestModel
+def setUpModule():
+    pass
 
 
-def test_field_pk_id():
-    with pytest.raises(FieldError):
-        class User(Model):
-            pk = IntegerField('pk')
+def tearDownModule():
+    pass
 
 
-def test_field_init(test_client):
-    with pytest.raises(AttributeError):
-        user = test_client(name='python', gender='male')
-    with pytest.raises(TypeError):
-        user = test_client(name='python', age='11')
+class RegularTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        class DemoModel(Model):
+            name = TextField()
+            age = IntegerField()
+
+        cls.model = DemoModel
+
+    @classmethod
+    def tearDownclass(cls):
+        config.DB_FILE = ORIGINAL_DB_PATH
+
+    def setUp(self):
+        self.dir = dir = tempfile.TemporaryDirectory()
+        db_path = os.path.join(dir.name, 'sqlite.db')
+        config.DB_FILE = db_path
+        self.model.create_table()
+
+        self.demo = demo = self.model(name='Guido', age=65)
+        demo.save()
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_field_pk_id_defined(self):
+        try:
+            class _(Model):
+                pk = IntegerField()
+        except FieldError:
+            pass
+        else:
+            self.fail("Did not raise FieldError")
+
+    def test_field_init_error(self):
+        self.assertRaises(
+            AttributeError,
+            self.model,
+            nickname='Guido',
+            age=65
+        )
+        self.assertRaises(
+            TypeError,
+            self.model,
+            name='Guido',
+            age='65'
+        )
+
+    def test_init_attr(self):
+        demo = self.model(name='BDFL', age=65)
+        self.assertEqual(demo.name, 'BDFL')
+        self.assertEqual(demo.age, 65)
+        self.assertTrue(isinstance(demo.pk, NewId))
+
+    def test_create(self):
+        self.assertEqual(self.demo.pk, 1)
+
+    def test_read(self):
+        self.assertEqual(self.demo.name, 'Guido')
+
+    def test_delete(self):
+        self.demo.delete()
+        self.assertTrue(isinstance(self.demo.pk, NewId))
+        recs = self.model.objects.query()
+        self.assertEqual(len(recs), 0)
 
 
-def test_cduq(test_client):
-    user1 = test_client(name='guido', age=1)
-    user2 = test_client(name='linus', age=2)
-    user3 = test_client(name='turing', age=3)
-    user1.save()
+class Many2oneTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        class Exam(Model):
+            nickname = TextField()
+            grade = IntegerField()
+            user = Many2one(related_model="User")
 
-    with pytest.raises(AttributeError):
-        user1.pk = 2
+        cls.exam_model = Exam
 
-    user1 = test_client.objects.get(pk=1)
-    assert user1.name == 'guido'
-    assert len(test_client.objects.query()) == 1
+    @classmethod
+    def tearDownclass(cls):
+        config.DB_FILE = ORIGINAL_DB_PATH
 
-    assert user2.pk is None
-    user2.save()
-    assert user2.pk == 2
+    def setUp(self):
+        self.dir = dir = tempfile.TemporaryDirectory()
+        db_path = os.path.join(dir.name, 'sqlite.db')
+        config.DB_FILE = db_path
+        self.exam_model.create_table()
+        User.create_table()
+        self.user = User(name='Guido', age=65)
+        self.user.save()
 
-    user3.save()
-    user2 = test_client.objects.get(pk=2)
-    assert user2.age == 2
+    def tearDown(self):
+        self.dir.cleanup()
 
-    all_user = test_client.objects.query()
-    assert len(all_user) == 3
-    assert user1 in all_user
+    def test_many2one_init(self):
+        exam = self.exam_model(nickname='Guido', grade=80)
+        self.assertEqual(exam.user, None)
+        exam.user = self.user.pk
+        self.assertEqual(exam.user.pk, self.user.pk)
 
-    user1.delete()
-    assert len(test_client.objects.query()) == 2
-
-    all_user = test_client.objects.query()
-    assert user1 not in all_user
-
+    def test_many2one_save(self):
+        exam = self.exam_model(nickname='Guido', grade=80, user=self.user.pk)
+        exam.save()
+        self.assertEqual(exam.user.pk, self.user.pk)
