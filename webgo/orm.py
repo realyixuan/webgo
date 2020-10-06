@@ -4,7 +4,7 @@ import logging
 from collections import abc
 
 from webgo.exceptions import FieldError
-from webgo.config import DB_FILE
+from webgo import config
 
 lock = threading.Lock()
 
@@ -31,7 +31,10 @@ class MyCursor(sqlite3.Cursor):
 class DBConnect:
     """ DB connection context manager """
     def __init__(self):
-        self.conn = sqlite3.connect(DB_FILE, factory=MyConnection)
+        self.conn = sqlite3.connect(
+            database=config.DB_FILE,
+            factory=MyConnection
+        )
 
     def __enter__(self):
         return self.conn
@@ -62,7 +65,7 @@ class ModelMetaclass(type):
     models = {}
 
     def __new__(mcs, name, bases, attrs):
-        if attrs.get('__abstract__'):
+        if attrs.get(f'_{name}__abstract'):
             attrs['__models__'] = mcs.models
             return type.__new__(mcs, name, bases, attrs)
         __fields__ = {}
@@ -132,6 +135,8 @@ class RecordSet(abc.Set):
 
     def get(self, pk):
         """ Return a single record """
+        if pk is None:
+            return None
         cols = list(self.model.__fields__.keys())
         colstr = ','.join(cols)
         with DBConnect() as conn:
@@ -164,12 +169,12 @@ class Model(metaclass=ModelMetaclass):
     Define all abstract methods interact with DB
 
     class attrs:
-        __abstract__ : don't create table in DB if True
+        __abstract   : don't create table in DB if True
         __table__    : the name of relative table (which is lowercase of class name)
-        __fields__  : dict that stores all models' field name-object paris
+        __fields__   : dict that stores all models' field name-object paris
         __models__   : dict to store all name-class pairs of subclass of Model
     """
-    __abstract__ = True
+    __abstract = True
 
     objects = RecordSet()
 
@@ -185,8 +190,8 @@ class Model(metaclass=ModelMetaclass):
         if 'pk' not in kwargs:
             pk = NewId()
             kwargs['pk'] = pk
-        for k, v in kwargs.items():
-            self.__fields__[k].__set__(self, v)
+        for k in self.__fields__:
+            self.__fields__[k].__set__(self, kwargs.get(k))
 
     @classmethod
     def create_table(cls):
@@ -202,13 +207,19 @@ class Model(metaclass=ModelMetaclass):
             tables = set(
                 map(lambda x: x[0], conn.execute(get_tables).fetchall())
             )
-            for class_ in cls.__subclasses__():
-                if class_.__name__.lower() in tables:
+
+            if hasattr(cls, f'_{cls.__name__}__abstract'):
+                models = cls.__subclasses__()
+            else:
+                models = [cls]
+
+            for model in models:
+                if model.__name__.lower() in tables:
                     continue
                 cols = ','.join([f'{field.col_name} {field.col_type}'
-                                 for field in class_.__fields__.values()])
-                conn.execute(f"CREATE TABLE {class_.__table__} ({cols})")
-                logger.info(f'Table {class_.__table__} created')
+                                 for field in model.__fields__.values()])
+                conn.execute(f"CREATE TABLE {model.__table__} ({cols})")
+                logger.info(f'Table {model.__table__} created')
 
     def _create(self):
         """ Create record by instance of class """
@@ -240,6 +251,7 @@ class Model(metaclass=ModelMetaclass):
             """
             with DBConnect() as conn:
                 conn.execute(sql)
+            self.__fields__['pk'].__set__(self, NewId())
 
     def save(self):
         with lock:
