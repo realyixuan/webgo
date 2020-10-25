@@ -350,6 +350,19 @@ class Many2one(Field):
         return related_class.objects.get(pk=value)
 
 
+class One2many(Field):
+    def __init__(self, related_model, related_field, **kwargs):
+        self.related_model = related_model
+        self.related_field = related_field
+        super().__init__('one2many', **kwargs)
+
+    def __get__(self, inst, class_):
+        if inst is None:
+            return self
+        related_class = inst.__models__[self.related_model]
+        return related_class.objects.query(**{self.related_field: inst.pk})
+
+
 class User(Model):
     name = TextField()
     age = IntegerField()
