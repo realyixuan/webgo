@@ -343,6 +343,11 @@ class Many2one(Field):
         super().__init__('many2one', **kwargs)
 
     def __get__(self, inst, class_):
+        """
+        issues:
+            TODO: How to address problem get identical values repeatedly
+                AND How to caching values
+        """
         if inst is None:
             return self
         related_class = inst.__models__[self.related_model]
@@ -361,6 +366,10 @@ class One2many(Field):
             return self
         related_class = inst.__models__[self.related_model]
         return related_class.objects.query(**{self.related_field: inst.pk})
+
+    def __set__(self, inst, class_):
+        """ not permitted to evaluate One2many Field"""
+        raise FieldError("One2many can't be assigned!")
 
 
 class User(Model):

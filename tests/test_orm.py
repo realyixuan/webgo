@@ -169,7 +169,7 @@ class One2manyTest(unittest.TestCase):
     def tearDown(self):
         self.dir.cleanup()
 
-    def test_one2many(self):
+    def test_one2many_get(self):
         self.exam_model(grade=80, person_id=self.person.pk).save()
         self.exam_model(grade=80, person_id=self.person.pk).save()
 
@@ -179,3 +179,10 @@ class One2manyTest(unittest.TestCase):
 
         self.assertEqual(grade_set, {1, 2})
 
+    # def test_one2many_set(self):
+    #     try:
+    #         self.person.grade_ids = 10
+    #     except FieldError:
+    #         pass
+    #     else:
+    #         self.fail("Did not raise FieldError!")
