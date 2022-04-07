@@ -3,8 +3,9 @@
 *.sqlite
 .idea/
 /__main__.py
-/demo
 /build
 /dist
 /webgo.egg-info
 .mypy_cache/
+/_localdemo
+/.pytest_cache
