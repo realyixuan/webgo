@@ -1,5 +1,11 @@
+import time
 import logging
 import socket
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -7,21 +13,26 @@ _logger = logging.getLogger(__name__)
 class Server:
     def __init__(self, address):
         self.address = address
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def serve(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(self.address)
+        self.sock.bind(self.address)
         try:
-            sock.listen(1)
-            connection, address = sock.accept()
-            try:
-                http_message = parser(connection, address)
-                result = app(http_message)
-                response(result, connection, address)
-            finally:
-                connection.close()
+            self.sock.listen(1)
+            _logger.info(f"server listening on {self.address}")
+            while True:
+                time.sleep(0.5)
+                connection, address = self.sock.accept()
+                try:
+                    http_message = parser(connection, address)
+                    result = app(http_message)
+                    if result:
+                        response(result, connection, address)
+                    _logger.info(f"successful processing request {http_message['method']} {http_message['path']}")
+                finally:
+                    connection.close()
         finally:
-            sock.close()
+            self.sock.close()
 
 
 def response(body, connection, address):
@@ -35,6 +46,7 @@ def response(body, connection, address):
     for header in response_headers:
         connection.sendall(header.encode('iso-8859-1'))
     connection.sendall(body.encode('utf8'))
+    connection.sendall(b'the should not appear...')
 
 
 def parser(connection, address):
@@ -44,11 +56,21 @@ def parser(connection, address):
     start_line = http_io.readline()
     method, path, http_version = start_line.decode('iso-8859-1').strip().split()
     http_message['method'] = method
-    http_message['path'] = path
+
+    if '?' in path:
+        pure_path, params = path.split('?')
+        http_message['path'] = pure_path
+        http_message['params'] = {}
+        for param_pair in params.split('&'):
+            key, value = param_pair.split('=')
+            http_message['params'][key] = value
+    else:
+        http_message['path'] = path
+        http_message['params'] = {}
+
     http_message['http_version'] = http_version
 
     while (headerline := http_io.readline()) != b'\r\n':
-        print(headerline)
         field, value = headerline.decode('iso-8859-1').split(':', 1)
         http_message[field] = value.strip()
 
@@ -87,8 +109,14 @@ class HTTPMessage:
 
 
 def app(request):
-    return f"hello {request['User-Agent']}"
+    if request['path'] == '/':
+        if 'name' in request['params']:
+            return f"<h1>hello {request['params']['name']}</h1>"
+        else:
+            return "hello world"
+    else:
+        return None
 
 
 if __name__ == '__main__':
-    Server(('localhost', 9001)).serve()
+    Server(('localhost', 9002)).serve()
