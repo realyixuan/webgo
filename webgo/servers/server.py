@@ -1,6 +1,6 @@
-import time
 import logging
 import socket
+import threading
 
 logging.basicConfig(
     level=logging.INFO,
@@ -9,11 +9,14 @@ logging.basicConfig(
 
 _logger = logging.getLogger(__name__)
 
+ENCODING = 'iso-8859-1'
+
 
 class Server:
     def __init__(self, address):
         self.address = address
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock = sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     def serve(self):
         self.sock.bind(self.address)
@@ -21,18 +24,59 @@ class Server:
             self.sock.listen(1)
             _logger.info(f"server listening on {self.address}")
             while True:
-                time.sleep(0.5)
                 connection, address = self.sock.accept()
-                try:
-                    http_message = parser(connection, address)
-                    result = app(http_message)
-                    if result:
-                        response(result, connection, address)
-                    _logger.info(f"successful processing request {http_message['method']} {http_message['path']}")
-                finally:
-                    connection.close()
+                self.process(connection, address)
+
         finally:
             self.sock.close()
+
+    def process(self, connection, addr):
+        environ = self.parse_http(connection, addr)
+        self.handle(environ, connection)
+
+    def parse_http(self, conn, addr):
+        return {}
+
+    def handle(self, environ, connection):
+        t = threading.Thread(target=self._handle, args=(environ, connection))
+        t.start()
+
+    def _handle(self, environ, connection):
+        headers = []
+        headers_sent = []
+
+        def write(data):
+            if not headers_sent:
+                status, response_headers = headers_sent[:] = headers
+
+                connection.sendall(f"HTTP/1.1 {status}\r\n".encode(ENCODING))
+                for k, v in response_headers:
+                    connection.sendall(f"{k}: {v}\r\n".encode(ENCODING))
+                connection.sendall(b"\r\n")
+
+            connection.sendall(data)
+
+        def start_response(status, response_headers, exc_info=None):
+            headers[:] = [status, response_headers]
+            return write
+
+        result = self.app(environ, start_response)
+        _logger.info(f"{headers[0]}")
+
+        if not headers_sent:
+            headers[1].append(('Content-Length', len(result[0])))
+
+        for data in result:
+            write(data)
+
+        connection.close()
+
+    def set_app(self, app):
+        self.app = app
+
+
+class App:
+    pass
 
 
 def response(body, connection, address):
@@ -108,15 +152,19 @@ class HTTPMessage:
         pass
 
 
-def app(request):
-    if request['path'] == '/':
-        if 'name' in request['params']:
-            return f"<h1>hello {request['params']['name']}</h1>"
-        else:
-            return "hello world"
-    else:
-        return None
+def app(environ, start_response):
+    body = \
+b"""\
+Hello World
+what the fuck
+"""
+    status = '200 OK'
+    headers = [('Content-type', 'text/plain')]
+    start_response(status, headers)
+    return [body]
 
 
 if __name__ == '__main__':
-    Server(('localhost', 9002)).serve()
+    server = Server(('localhost', 8888))
+    server.set_app(app)
+    server.serve()
