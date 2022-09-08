@@ -16,7 +16,8 @@ class Server:
     def __init__(self, address):
         self.address = address
         self.sock = sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # import struct; sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
 
     def serve(self):
         self.sock.bind(self.address)
@@ -35,7 +36,51 @@ class Server:
         self.handle(environ, connection)
 
     def parse_http(self, conn, addr):
-        return {}
+        environ = {}
+
+        http_io = HTTPSocketIO(conn)
+
+        startline = http_io.readline()
+        startline_items = startline.split()
+
+        environ['REQUEST_METHOD'] = startline_items[0]
+        environ['SERVER_PROTOCOL'] = startline_items[2]
+
+        path, _, query_string = startline_items[1].partition('?')
+        if query_string:
+            environ['QUERY_STRING'] = query_string
+        environ['PATH_INFO'] = path
+
+        while request_header := http_io.readline():
+            key, value = [v.strip() for v in request_header.split(':', maxsplit=1)]
+            if key == 'Content-Type':
+                environ['CONTENT-TYPE'] = value
+            elif key == 'Content-Length':
+                environ['CONTENT-LENGTH'] = int(value)
+            elif key == 'Host':
+                host, _, port = value.partition(':')
+                environ['SERVER_NAME'] = host
+                environ['SERVER_PORT'] = port or 80     # for http only
+            environ[f'HTTP_{key.upper()}'] = value
+
+        else:
+            if environ.get('SERVER_NAME', '') == '':
+                raise Exception
+
+        # WSGI variables
+        environ['wsgi.version'] = (1, 0)
+        environ['wsgi.url_scheme'] = 'http'
+
+        # put request body in
+        environ['wsgi.input'] = ...
+
+        environ['wsgi.errors'] = ...
+
+        environ['wsgi.multithread'] = True
+        environ['wsgi.multiprocess'] = False
+        environ['wsgi.run_once'] = False
+
+        return environ
 
     def handle(self, environ, connection):
         t = threading.Thread(target=self._handle, args=(environ, connection))
@@ -135,7 +180,7 @@ class HTTPSocketIO:
         while line[-2:] != [b'\r', b'\n']:
             byte_char = self._connection.recv(1)
             line.append(byte_char)
-        return b''.join(line)
+        return b''.join(line[:-2]).decode(ENCODING)
 
     def read(self, size):
         content = []
@@ -153,6 +198,7 @@ class HTTPMessage:
 
 
 def app(environ, start_response):
+    print(environ)
     body = \
 b"""\
 Hello World
