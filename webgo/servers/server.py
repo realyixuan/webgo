@@ -3,13 +3,43 @@ import socket
 import threading
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
 )
 
 _logger = logging.getLogger(__name__)
 
 ENCODING = 'iso-8859-1'
+
+
+class InputStream:
+    def __init__(self, conn):
+        self._conn = conn
+
+    def read(self, size):
+        data = self._conn.recv(size)
+        return data
+
+    def readline(self):
+        pass
+
+    def readlines(self, hint):
+        pass
+
+    def __iter__(self):
+        pass
+
+
+class ErrorStream:
+    def flush(self):
+        raise NotImplementedError
+
+    def write(self, string):
+        pass
+
+    def writelines(self, seq):
+        raise NotImplementedError
+
 
 
 class Server:
@@ -40,7 +70,7 @@ class Server:
 
         http_io = HTTPSocketIO(conn)
 
-        startline = http_io.readline()
+        startline = http_io.readline().decode(ENCODING)
         startline_items = startline.split()
 
         environ['REQUEST_METHOD'] = startline_items[0]
@@ -51,7 +81,7 @@ class Server:
             environ['QUERY_STRING'] = query_string
         environ['PATH_INFO'] = path
 
-        while request_header := http_io.readline():
+        while (request_header := http_io.readline().decode(ENCODING)) not in ('\r\n', '\n', ''):
             key, value = [v.strip() for v in request_header.split(':', maxsplit=1)]
             if key == 'Content-Type':
                 environ['CONTENT-TYPE'] = value
@@ -72,13 +102,17 @@ class Server:
         environ['wsgi.url_scheme'] = 'http'
 
         # put request body in
-        environ['wsgi.input'] = ...
+        environ['wsgi.input'] = InputStream(conn)
 
-        environ['wsgi.errors'] = ...
+        environ['wsgi.errors'] = ErrorStream()
 
         environ['wsgi.multithread'] = True
         environ['wsgi.multiprocess'] = False
         environ['wsgi.run_once'] = False
+
+        if content_length := environ.get('CONTENT-LENGTH'):
+            payload = environ['wsgi.input'].read(content_length)
+            environ['data'] = payload
 
         return environ
 
@@ -177,10 +211,13 @@ class HTTPSocketIO:
 
     def readline(self):
         line = []
-        while line[-2:] != [b'\r', b'\n']:
+        # XXX: recognize a single LF as a line terminator and ignore the leading CR.
+        # refer to: https://www.rfc-editor.org/rfc/rfc2616#section-19.3
+        while not line\
+                or (line[-1] != b'\n' and line[-1] != b''):
             byte_char = self._connection.recv(1)
             line.append(byte_char)
-        return b''.join(line[:-2]).decode(ENCODING)
+        return b''.join(line)
 
     def read(self, size):
         content = []
@@ -198,12 +235,7 @@ class HTTPMessage:
 
 
 def app(environ, start_response):
-    print(environ)
-    body = \
-b"""\
-Hello World
-what the fuck
-"""
+    body = b'hello world'
     status = '200 OK'
     headers = [('Content-type', 'text/plain')]
     start_response(status, headers)
