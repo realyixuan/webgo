@@ -84,9 +84,9 @@ class Server:
         while (request_header := http_io.readline().decode(ENCODING)) not in ('\r\n', '\n', ''):
             key, value = [v.strip() for v in request_header.split(':', maxsplit=1)]
             if key == 'Content-Type':
-                environ['CONTENT-TYPE'] = value
+                environ['CONTENT_TYPE'] = value
             elif key == 'Content-Length':
-                environ['CONTENT-LENGTH'] = int(value)
+                environ['CONTENT_LENGTH'] = int(value)
             elif key == 'Host':
                 host, _, port = value.partition(':')
                 environ['SERVER_NAME'] = host
@@ -109,10 +109,6 @@ class Server:
         environ['wsgi.multithread'] = True
         environ['wsgi.multiprocess'] = False
         environ['wsgi.run_once'] = False
-
-        if content_length := environ.get('CONTENT-LENGTH'):
-            payload = environ['wsgi.input'].read(content_length)
-            environ['data'] = payload
 
         return environ
 
