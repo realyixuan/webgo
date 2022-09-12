@@ -46,7 +46,7 @@ class Server:
     def __init__(self, address):
         self.address = address
         self.sock = sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # import struct; sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
 
     def serve_forever(self):
