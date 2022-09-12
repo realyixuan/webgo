@@ -49,7 +49,7 @@ class Server:
         # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # import struct; sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
 
-    def serve(self):
+    def serve_forever(self):
         self.sock.bind(self.address)
         try:
             self.sock.listen(1)
@@ -228,17 +228,3 @@ class HTTPSocketIO:
 class HTTPMessage:
     def __init__(self):
         pass
-
-
-def app(environ, start_response):
-    body = b'hello world'
-    status = '200 OK'
-    headers = [('Content-type', 'text/plain')]
-    start_response(status, headers)
-    return [body]
-
-
-if __name__ == '__main__':
-    server = Server(('localhost', 8888))
-    server.set_app(app)
-    server.serve()
