@@ -41,7 +41,6 @@ class ErrorStream:
         raise NotImplementedError
 
 
-
 class Server:
     def __init__(self, address):
         self.address = address
@@ -150,57 +149,6 @@ class Server:
         self.app = app
 
 
-class App:
-    pass
-
-
-def response(body, connection, address):
-    response_headers = (
-        "HTTP/1.1 200 OK\r\n",
-        "Content-Type: text/html; charset=UTF-8\r\n",
-        f"Content-Length: {len(body)}\r\n",
-        "\r\n",
-    )
-
-    for header in response_headers:
-        connection.sendall(header.encode('iso-8859-1'))
-    connection.sendall(body.encode('utf8'))
-    connection.sendall(b'the should not appear...')
-
-
-def parser(connection, address):
-    http_message = {}
-
-    http_io = HTTPSocketIO(connection)
-    start_line = http_io.readline()
-    method, path, http_version = start_line.decode('iso-8859-1').strip().split()
-    http_message['method'] = method
-
-    if '?' in path:
-        pure_path, params = path.split('?')
-        http_message['path'] = pure_path
-        http_message['params'] = {}
-        for param_pair in params.split('&'):
-            key, value = param_pair.split('=')
-            http_message['params'][key] = value
-    else:
-        http_message['path'] = path
-        http_message['params'] = {}
-
-    http_message['http_version'] = http_version
-
-    while (headerline := http_io.readline()) != b'\r\n':
-        field, value = headerline.decode('iso-8859-1').split(':', 1)
-        http_message[field] = value.strip()
-
-    if 'Content-Length' not in http_message:
-        return http_message
-
-    http_message['body'] = http_io.read(http_message['Content-Length']).decode('iso-8859-1')
-
-    return http_message
-
-
 class HTTPSocketIO:
     def __init__(self, connection):
         self._connection = connection
@@ -223,8 +171,3 @@ class HTTPSocketIO:
             content.append(data)
             total += len(data)
         return b''.join(content)
-
-
-class HTTPMessage:
-    def __init__(self):
-        pass
