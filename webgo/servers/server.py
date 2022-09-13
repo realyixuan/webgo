@@ -91,7 +91,7 @@ class Server:
                 host, _, port = value.partition(':')
                 environ['SERVER_NAME'] = host
                 environ['SERVER_PORT'] = port or 80     # for http only
-            environ[f'HTTP_{key.upper()}'] = value
+            environ[f"HTTP_{key.upper().replace('-', '_')}"] = value
 
         else:
             if environ.get('SERVER_NAME', '') == '':
