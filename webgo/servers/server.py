@@ -56,14 +56,18 @@ class InputStream:
 
 
 class ErrorStream:
-    def flush(self):
-        raise NotImplementedError
+    def __init__(self, conn):
+        self._conn = conn
 
-    def write(self, string):
-        pass
+    def flush(self):
+        """ no-op """
+
+    def write(self, b):
+        return self._conn.send(b)
 
     def writelines(self, seq):
-        raise NotImplementedError
+        for line in seq:
+            self._conn.sendall(line)
 
 
 class Server:
@@ -131,7 +135,7 @@ class Server:
 
         environ['wsgi.input'] = InputStream(conn, environ.get('CONTENT_LENGTH', 0))
 
-        environ['wsgi.errors'] = ErrorStream()
+        environ['wsgi.errors'] = ErrorStream(conn)
 
         environ['wsgi.multithread'] = True
         environ['wsgi.multiprocess'] = False
