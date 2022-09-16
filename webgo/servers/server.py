@@ -13,21 +13,46 @@ ENCODING = 'iso-8859-1'
 
 
 class InputStream:
-    def __init__(self, conn):
+    def __init__(self, conn, remains=0):
         self._conn = conn
+        self._remains = remains
 
-    def read(self, size):
-        data = self._conn.recv(size)
+    def read(self, size=-1):
+        if self._remains <= 0:
+            return b''
+
+        if size < 0:
+            sz = self._remains
+        else:
+            sz = min(size, self._remains)
+        data = self._conn.recv(sz)
+        self._remains -= len(data)
         return data
 
-    def readline(self):
-        pass
+    def readline(self, size=-1):
+        if size < 0:
+            sz = self._remains
+        else:
+            sz = min(size, self._remains)
 
-    def readlines(self, hint):
-        pass
+        line = []
+        while (
+                sz > len(line)
+                and (not line or line[-1] != '\n')
+        ):
+            c = self._conn.recv(1)
+            if not c:
+                break
+            line.append(c)
+        self._remains -= len(line)
+        return b''.join(line)
+
+    def readlines(self):
+        return [line for line in self.readline()]
 
     def __iter__(self):
-        pass
+        while self._remains > 0:
+            yield self.read(1)
 
 
 class ErrorStream:
@@ -65,6 +90,10 @@ class Server:
         self.handle(environ, connection)
 
     def parse_http(self, conn, addr):
+        """
+        Since PEP3333 states: "..., the environ dictionary MAY also contain arbitrary operating-system “environment variables”, ..."
+        so skip over it.
+        """
         environ = {}
 
         http_io = HTTPSocketIO(conn)
@@ -100,8 +129,7 @@ class Server:
         environ['wsgi.version'] = (1, 0)
         environ['wsgi.url_scheme'] = 'http'
 
-        # put request body in
-        environ['wsgi.input'] = InputStream(conn)
+        environ['wsgi.input'] = InputStream(conn, environ.get('CONTENT_LENGTH', 0))
 
         environ['wsgi.errors'] = ErrorStream()
 
