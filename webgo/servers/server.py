@@ -1,6 +1,7 @@
 import logging
 import socket
 import threading
+from datetime import datetime
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -163,7 +164,14 @@ class Server:
             connection.sendall(data)
 
         def start_response(status, response_headers, exc_info=None):
-            headers[:] = [status, response_headers]
+            if exc_info:
+                # If headers has been sent already, raise original exception,
+                # because, at this time, can't change headers anymore
+                if headers_sent:
+                    raise exc_info[1].with_traceback(exc_info[2])
+            elif headers:
+                raise AssertionError('Headers already set')
+            headers[:] = [status, [(k, v) for k, v in response_headers if k != 'Content-Length']]
             return write
 
         result = self.app(environ, start_response)
@@ -171,9 +179,16 @@ class Server:
 
         if not headers_sent:
             headers[1].append(('Content-Length', len(result[0])))
+            headers[1].append(('Server', 'WebgoServer'))
+            headers[1].append(('Date', datetime.now().strftime('%a, %d %b %Y %H:%M:%S GMT')))
 
-        for data in result:
-            write(data)
+        try:
+            for data in result:
+                if data:
+                    write(data)
+        finally:
+            if hasattr(result, 'close'):
+                result.close()
 
         connection.close()
 
