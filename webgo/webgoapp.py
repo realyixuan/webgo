@@ -3,10 +3,9 @@ import importlib
 import inspect
 import logging
 
-import webob
-
 from webgo.template import StaticFile
 from webgo import orm
+from webgo.wsgirequest import Request, Response
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +19,12 @@ class Application:
         path = request.path
         handlers = self.handlers[request.method]
         if path not in handlers:
-            return webob.Response(text='Not Found')
+            return Response(body='Not Found')
         handler = handlers[path]
         if hasattr(handler.__self__, 'mimetype'):
             mime_type = handler.__self__.mimetype
-            return webob.Response(text=handler(request),
-                                  content_type=mime_type)
-        return webob.Response(text=handler(request))
+            return Response(body=handler(request), content_type=mime_type)
+        return Response(body=handler(request))
 
     def response(self, request):
         return self.build_response(request)
@@ -35,8 +33,9 @@ class Application:
         pass
 
     def __call__(self, environ, start_response):
-        request = webob.Request(environ)
-        return self.response(request)(environ, start_response)
+        rep = self.response(Request(environ))
+        start_response(rep.status, rep.headers)
+        return rep
 
 
 def route_mapping(upackage: str) -> dict:
