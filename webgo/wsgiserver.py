@@ -3,14 +3,13 @@ import sys
 import types
 import logging
 import argparse
-from multiprocessing.pool import ThreadPool
-from wsgiref.simple_server import WSGIServer, WSGIRequestHandler
 from importlib.abc import Loader, MetaPathFinder
 from importlib.util import spec_from_file_location
 
 from webgo import config
 from webgo import webgoapp
 from webgo.template import get_abs_path
+from webgo.servers import Server
 
 logger = logging.getLogger(__name__)
 
@@ -35,31 +34,12 @@ def run_server(app):
     make_server('', 8080, app).serve_forever()
 
 
-class TheadPoolWSGIServer(WSGIServer):
-    def __init__(self, workers, *args, **kwargs):
-        WSGIServer.__init__(self, *args, **kwargs)
-        self.workers = workers
-        self.pool = ThreadPool(self.workers)
-
-    def process_request(self, request, client_address):
-        self.pool.apply_async(
-            WSGIServer.process_request,
-            args=(self, request, client_address)
-        )
-
-
 def make_server(
         host,
         port,
-        app,
-        handler_class=WSGIRequestHandler,
-        workers=8
+        app
 ):
-    httpd = TheadPoolWSGIServer(
-        workers=workers,
-        server_address=(host, port),
-        RequestHandlerClass=handler_class
-    )
+    httpd = Server((host, port))
     httpd.set_app(app)
     return httpd
 
