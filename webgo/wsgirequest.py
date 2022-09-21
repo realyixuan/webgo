@@ -54,6 +54,10 @@ class Response:
         return '200 OK'
 
     @property
+    def content_length(self):
+        return len(self.body)
+
+    @property
     def headers(self):
         return [
             ('Content-type', self.content_type),

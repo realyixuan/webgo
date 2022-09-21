@@ -178,7 +178,7 @@ class Server:
         _logger.info(f"{headers[0]}")
 
         if not headers_sent:
-            headers[1].append(('Content-Length', len(result[0])))
+            headers[1].append(('Content-Length', result.content_length))
             headers[1].append(('Server', 'WebgoServer'))
             headers[1].append(('Date', datetime.now().strftime('%a, %d %b %Y %H:%M:%S GMT')))
 
